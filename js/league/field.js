@@ -38,9 +38,10 @@ export function validateField(picks) {
  * at-large = best remaining Scores, seeds by an S-curve of the Seed Score. It does not separate conference rivals; the
  * committee is expected to edit it.
  */
-export function suggestField(rows, atLarge = 37) {
+export function suggestField(rows, atLarge = 37, champs = null) {
   const byConf = new Map();
   for (const r of rows) if (!byConf.has(r.conf) || r.score > byConf.get(r.conf).score) byConf.set(r.conf, r);
+  if (champs) for (const [conf, team] of champs) { const r = rows.find((x) => x.team === team); if (r) byConf.set(conf, r); }   // real conference-tournament winners take the auto-bids
   const autoIds = new Set([...byConf.values()].map((r) => r.team));
   const open = rows.filter((r) => !autoIds.has(r.team)).sort((a, b) => b.score - a.score);
   const largeIn = open.slice(0, atLarge), firstOut = open.slice(atLarge, atLarge + 4), nextOut = open.slice(atLarge + 4, atLarge + 8);

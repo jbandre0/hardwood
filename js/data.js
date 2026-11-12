@@ -66,7 +66,7 @@ async function buildCore(seasonId) {
   });
   const teamGames = teams.map(() => []);
   for (const g of games) if (g.a != null) { teamGames[g.a].push(g); teamGames[g.b].push(g); }
-  const ncaa = data.ncaa || { field: [] };
+  const ncaa = { ...(data.ncaa || {}), field: state.content.field || (data.ncaa && data.ncaa.field) || [] };
   const seed = new Map(); for (const f of ncaa.field) seed.set(f.team, { seed: f.seed, region: f.region, ff: f.ff });
   const confs = [...new Set(teams.map((t) => t.conf))].sort((x, y) => x.localeCompare(y));
   const season = { id, label: info ? info.label : id, status: info ? info.status : "complete", day: lastPlayedDay(state), played: playedCount(state), total: state.games.length, regularSeasonDays: 42 };

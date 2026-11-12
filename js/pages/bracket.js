@@ -88,11 +88,11 @@ const LABELS = ["First Round", "Second Round", "Sweet 16", "Elite Eight"];
         <div class="card-head"><h2>First Four</h2><span class="muted">Day 48 &middot; Dayton</span></div>
         <div class="grid cols-2" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${first4.map(gameBox).join("")}</div>
       </div>
-      <div class="card" id="review">
+      ${art.body ? `<div class="card" id="review">
         <div class="card-head"><h2>${esc((art.headline || "Tournament in review").split(":")[0])}</h2><span class="pill mint">Bracketology HQ</span></div>
         <p class="muted" style="margin-top:-6px">${esc(art.headline || "")}</p>
         <div class="prose">${review}</div>
-      </div>`;
+      </div>` : ""}`;
     if (location.hash === "#review") document.getElementById("review").scrollIntoView();
   } catch (e) { fail(view, e); }
 })();

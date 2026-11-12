@@ -1,5 +1,6 @@
 // League state for one season: baseline data (static JSON) + changes saved in the browser, with game rolling, recording,
 // playing a day and undo. Works in the browser and in Node (tests): data comes in through a loader function.
+import { tournamentSeeds, regularSeasonLines, ctSchedule, ctGameId, ncaaGames } from "./tournament.js";
 import { playRecordedGame } from "../engine.js";
 import { computeSeason, ENG } from "./stats.js";
 
@@ -25,22 +26,23 @@ export const toGame = (g) => ({ id: g[0], day: g[1], type: g[2], ctx: g[3], a: g
 export function createState(data, overlay = null) {
   const games = data.games.rows.map(toGame);
   const box = new Map(data.box.rows.map((r) => [r[0], r]));
-  const state = { data, games, byId: new Map(games.map((g) => [g.id, g])), box, S: data.settings, recorded: [], meta: {}, cache: null };
+  const state = { data, games, byId: new Map(games.map((g) => [g.id, g])), box, S: data.settings, recorded: [], meta: {}, cache: null, extraGames: [], baseline: new Set(games.map((g) => g.id)) };
   state.content = baseContent(data);
   state.contentDirty = new Set();
   if (overlay && overlay.content) for (const [k, v] of Object.entries(overlay.content)) { state.content[k] = v; state.contentDirty.add(k); }
   if (overlay) {
-    for (const g of overlay.extraGames || []) { const x = toGame(g); state.games.push(x); state.byId.set(x.id, x); }
+    for (const g of overlay.extraGames || []) { const x = toGame(g); state.games.push(x); state.byId.set(x.id, x); state.extraGames.push(g); }
     for (const id of overlay.order || []) {
       const g = state.byId.get(id), sc = overlay.games[id];
       if (!g || !sc) continue;
       g.ptsA = sc[0]; g.ptsB = sc[1]; box.set(id, overlay.box[id]); state.recorded.push(id); state.meta[id] = (overlay.meta || {})[id] || {};
     }
   }
+  syncTournament(state);
   return state;
 }
 
-export function toOverlay(state, extraGames = []) {
+export function toOverlay(state, extraGames = state.extraGames || []) {
   const o = { format: 1, season: state.data.id, games: {}, box: {}, order: state.recorded.slice(), meta: {}, extraGames };
   for (const id of state.recorded) { const g = state.byId.get(id); o.games[id] = [g.ptsA, g.ptsB]; o.box[id] = state.box.get(id); o.meta[id] = state.meta[id]; }
   if (state.contentDirty && state.contentDirty.size) { o.content = {}; for (const k of state.contentDirty) o.content[k] = state.content[k]; }
@@ -96,6 +98,7 @@ export function rollAndRecord(state, gameId, seed) {
   const r = rollGame(state, gameId, seed);
   record(state, gameId, r, { seed });
   calc(state);
+  syncTournament(state);
   return r;
 }
 
@@ -112,6 +115,7 @@ export function playDay(state, day, baseSeed) {
   }
   for (const [g, r] of results) record(state, g.id, r, { seed: r.seed });
   calc(state);
+  syncTournament(state);
   return results.map(([g, r]) => ({ id: g.id, a: g.a, b: g.b, ptsA: r.ptsA, ptsB: r.ptsB, ot: r.ot }));
 }
 
@@ -124,6 +128,7 @@ export function undoLast(state, count = 1) {
     g.ptsA = null; g.ptsB = null; state.box.delete(id); delete state.meta[id];
   }
   state.cache = null;
+  syncTournament(state);
   return removed;
 }
 
@@ -159,4 +164,46 @@ function baseContent(data) {
 export function setContent(state, key, value) {
   state.content[key] = value;
   state.contentDirty.add(key);
+}
+
+
+/**
+ * Keep the generated tournament games in step with the results: conference tournaments once the regular season is
+ * finished, the NCAA tournament once every conference tournament is done and a field exists (content.field, or the
+ * baseline ncaa.json). Generated games that are unplayed and no longer valid are dropped. Baseline games are never touched.
+ */
+export function syncTournament(state) {
+  const want = new Map();                                   // id -> row
+  const regDone = !state.games.some((g) => (g.type === "Reg" || g.type === "Conf") && g.ptsA == null);
+  const teams = state.data.teams, confs = [...new Set(Object.values(teams).map((t) => t.conf))].sort((a, b) => a.localeCompare(b));
+  const baseCT = (conf) => state.games.some((g) => g.type === "CT" && g.ctx === conf && state.baseline.has(g.id));
+  if (regDone) {
+    const reg = state.games.filter((g) => g.type === "Conf" || g.type === "Reg");
+    confs.forEach((conf, ci) => {
+      if (baseCT(conf)) return;
+      const ts = regularSeasonLines(reg, Object.keys(teams).filter((id) => teams[id].conf === conf).map(Number));
+      const seeds = tournamentSeeds(ts, reg).map((t) => t.id);
+      const win = new Map(state.games.filter((g) => g.type === "CT" && g.ctx === conf && g.ptsA != null).map((g) => [[g.a, g.b].sort().join("|"), g.ptsA > g.ptsB ? g.a : g.b]));
+      for (const g of ctSchedule(seeds, (a, b) => win.get([a, b].sort().join("|")))) want.set(ctGameId(g.day, ci, g.pair), [ctGameId(g.day, ci, g.pair), g.day, "CT", conf, g.a, g.b, 0, null, null]);
+    });
+  }
+  const ctOpen = () => confs.some((conf) => !state.games.some((g) => g.type === "CT" && g.ctx === conf && g.day === 47 && g.ptsA != null)) ;
+  const field = state.content.field || (state.data.ncaa && state.data.ncaa.field && state.data.ncaa.field.length ? state.data.ncaa.field : null);
+  const baseNcaa = state.games.some((g) => g.type === "NCAA" && state.baseline.has(g.id));
+  if (field && field.length === 68 && !baseNcaa && regDone && !ctOpen()) {
+    const win = new Map(state.games.filter((g) => g.type === "NCAA" && g.ptsA != null).map((g) => [g.id, g.ptsA > g.ptsB ? g.a : g.b]));
+    for (const g of ncaaGames(field, (id) => win.get(id))) want.set(g.id, [g.id, g.day, "NCAA", g.ctx, g.a, g.b, 0, null, null]);
+  }
+  // drop stale generated games that are unplayed, add the missing ones
+  for (const row of state.extraGames.slice()) {
+    const g = state.byId.get(row[0]);
+    if (g && g.ptsA == null && !want.has(row[0]) && (g.type === "CT" || g.type === "NCAA")) {
+      state.games.splice(state.games.indexOf(g), 1); state.byId.delete(g.id); state.extraGames.splice(state.extraGames.indexOf(row), 1); state.cache = null;
+    }
+  }
+  for (const [id, row] of want) if (!state.byId.has(id)) {
+    const x = toGame(row); state.games.push(x); state.byId.set(id, x); state.extraGames.push(row);
+  }
+  state.games.sort((a, b) => a.day - b.day || a.id - b.id);
+  return state;
 }

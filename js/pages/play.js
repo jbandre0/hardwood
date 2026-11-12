@@ -1,6 +1,8 @@
 import { shell, fail } from "../ui.js";
 import { loadCore, resetCores, esc, badge, teamLink, signed } from "../data.js";
-import { rollAndRecord, playDay, undoLast, toOverlay, nextUnplayed, calc } from "../league/league.js";
+import { rollAndRecord, playDay, undoLast, toOverlay, nextUnplayed, calc, setContent, syncTournament } from "../league/league.js";
+import { computeBoard } from "../league/bracketology.js";
+import { suggestField, validateField } from "../league/field.js";
 import { saveOverlay, clearOverlay, exportAll, importAll, loadOverlay, unsavedSince } from "../league/store.js";
 
 const seed = () => crypto.getRandomValues(new Uint32Array(1))[0];
@@ -45,7 +47,9 @@ const fmt = (n) => n.toLocaleString();
               <div class="kpi"><small>Next day</small><b>${nextDay ?? "—"}</b><span>${dayGames.length} games</span></div>
             </div>
             ${complete ? `<p class="muted" style="margin:14px 0 0">${esc(season.label)} is complete. Switch to the live season in the top bar to keep playing.</p>` :
-              !nxt ? `<p class="muted" style="margin:14px 0 0">The regular season is complete. Conference tournaments (days 43-47) and the NCAA Tournament (days 48-54) come next.</p>` : `
+              !nxt && season.day === 47 && !state.content.field ? `<p class="muted" style="margin:14px 0 0">Conference tournaments are done. Build the 68-team NCAA field from the results (every conference champion gets its auto-bid, the rest from the Bracketology Board). You can refine seeds on the Bracketology page first.</p>
+                <div class="btn-row" style="margin-top:12px"><button class="btn" id="lockField" type="button">Build NCAA field</button><button class="btn ghost" id="undoDay" type="button">Undo last day</button></div><p class="status" id="status" aria-live="polite"></p>` :
+              !nxt ? `<p class="muted" style="margin:14px 0 0">${season.day >= 54 ? "The season is over. Season champion is on the March Madness page." : "The regular season is complete. Conference tournaments (days 43-47) and the NCAA Tournament (days 48-54) come next."}</p>` : `
             <div class="btn-row" style="margin-top:16px">
               <button class="btn" id="playDay" type="button">Play day ${nextDay} (${dayGames.length} games)</button>
               <button class="btn ghost" id="playOne" type="button">Play one game</button>
@@ -96,6 +100,17 @@ const fmt = (n) => n.toLocaleString();
     const persist = async () => { await saveOverlay(season.id, toOverlay(state, state.extraGames || [])); };
     const busy = (on, msg) => { for (const id of ["playDay", "playOne", "undoOne", "undoDay"]) { const b = document.getElementById(id); if (b) b.disabled = on; } if (status) status.textContent = msg || ""; };
 
+    document.getElementById("lockField")?.addEventListener("click", async () => {
+      const c = calc(state), B = core.data.bracketology || { settings: {} }, S = { q1Rank: 25, q2Rank: 50, badLossRank: 100, winWeight: 8, q1Pts: 1.5, q2Pts: 0.75, badLossPts: 1.5, atLarge: 37, seedBump: 2, ...B.settings };
+      const tm = teams.map((t) => ({ id: t.id, conf: t.conf, rating: t.rating, eff: t.eff }));
+      const rows = computeBoard({ teams: tm, games: state.games, throughDay: 47, picks: [], commAdj: [], settings: S }).rows;
+      const champs = new Map(state.games.filter((g) => g.type === "CT" && g.day === 47).map((g) => [g.ctx, g.ptsA > g.ptsB ? g.a : g.b]));
+      const picks = suggestField(rows, S.atLarge, champs), v = validateField(picks);
+      if (v.errors.length) { document.getElementById("status").textContent = "Could not build a valid field: " + v.errors[0]; return; }
+      setContent(state, "field", picks.filter((p) => p.group === "Field").map((p) => ({ team: p.team, seed: p.seed, region: p.region, ff: p.ff })));
+      syncTournament(state); await persist(); await render();
+      const st2 = document.getElementById("status"); if (st2) st2.textContent = "NCAA field set. First Four is day 48.";
+    });
     document.getElementById("playDay")?.addEventListener("click", async () => {
       busy(true, `Playing day ${nextDay}…`);
       await new Promise((r) => setTimeout(r, 20));
@@ -103,7 +118,7 @@ const fmt = (n) => n.toLocaleString();
         const res = playDay(state, nextDay, seed()); await persist();
         last = { title: `Day ${nextDay} results`, rows: res };
         await render();
-        document.getElementById("status").textContent = `Day ${nextDay} recorded and saved. Ratings re-solved.`;
+        const st_ = document.getElementById("status"); if (st_) st_.textContent = `Day ${nextDay} recorded and saved. Ratings re-solved.`;
       } catch (e) { busy(false, "Could not play: " + e.message); }
     });
     document.getElementById("playOne")?.addEventListener("click", async () => {

@@ -7,7 +7,7 @@ const ok = (c, m) => { if (c) pass++; else { bad.push(m); console.log('FAIL ' + 
   const b = await chromium.launch(); const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
   for (const season of ['season-1', 'season-2']) {
     await ctx.addInitScript((s) => { try { localStorage.setItem('hw-season', s); } catch (e) {} }, season);
-    for (const url of ['index.html', 'rankings.html', 'rankings.html#ap', 'standings.html', 'matchup.html?a=virginia&b=duke', 'team.html?t=virginia', 'bracket.html', 'bracketology.html', 'news.html', 'history.html', 'predictions.html', 'offseason.html', 'rankings.html#poll', 'about.html', 'play.html']) {
+    for (const url of ['index.html', 'rankings.html', 'rankings.html#ap', 'standings.html', 'matchup.html?a=virginia&b=duke', 'team.html?t=virginia', 'bracket.html', 'bracketology.html', 'news.html', 'history.html', 'predictions.html', 'offseason.html', 'recap.html?day=13', 'rankings.html#poll', 'about.html', 'play.html']) {
       const p = await ctx.newPage(); const errs = [];
       p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); }); p.on('requestfailed', r => errs.push('REQFAIL ' + r.url().slice(-50)));
       await p.goto(BASE + url + (url.includes('?') ? '&' : '?') + 's=' + season, { waitUntil: 'networkidle' }); await p.waitForTimeout(url.startsWith('matchup') ? 2500 : 700);

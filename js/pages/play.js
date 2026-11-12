@@ -5,6 +5,7 @@ import { rollAndRecord, rollGame, recordRolled, playDay, undoLast, toOverlay, ne
 import { computeBoard } from "../league/bracketology.js";
 import { suggestField, validateField } from "../league/field.js";
 import { lockDay, lockPrediction, DEFAULT_SIMS } from "../league/predictions.js";
+import { dayDone } from "../league/recap.js";
 import { saveOverlay, clearOverlay, exportAll, importAll, loadOverlay, unsavedSince } from "../league/store.js";
 
 const seed = () => crypto.getRandomValues(new Uint32Array(1))[0];
@@ -48,7 +49,7 @@ const fmt = (n) => n.toLocaleString();
             <div class="kpis">
               <div class="kpi"><small>Games played</small><b id="kPlayed">${fmt(season.played)}</b><span id="kTotal">of ${fmt(season.total)}</span></div>
               <div class="kpi"><small>Latest day</small><b>${season.day}</b><span>${season.day > 42 ? "of 54 (postseason)" : "of 42 regular-season days"}</span></div>
-              <div class="kpi"><small>Next day</small><b>${nextDay ?? "—"}</b><span>${dayGames.length} games</span></div>
+              <div class="kpi"><small>Next day</small><b>${nextDay ?? "—"}</b><span>${dayGames.length} games${season.day ? ` &middot; <a href="recap.html?day=${season.day}" style="color:var(--accent)">day ${season.day} recap</a>` : ""}</span></div>
             </div>
             ${complete ? `<p class="muted" style="margin:14px 0 0">${esc(season.label)} is complete. Switch to the live season in the top bar to keep playing.</p>` :
               !nxt && season.day === 47 && !state.content.field ? `<p class="muted" style="margin:14px 0 0">Conference tournaments are done. Build the 68-team NCAA field from the results (every conference champion gets its auto-bid, the rest from the Bracketology Board). You can refine seeds on the Bracketology page first.</p>
@@ -140,7 +141,7 @@ const fmt = (n) => n.toLocaleString();
         }
         const res = playDay(state, nextDay, seed()); await persist();
         last = { title: `Day ${nextDay} results`, rows: res };
-        await render();
+        location.href = `recap.html?day=${nextDay}`; return;
         const st_ = document.getElementById("status"); if (st_) st_.textContent = `Day ${nextDay} recorded and saved. Ratings re-solved.`;
       } catch (e) { busy(false, "Could not play: " + e.message); }
     });
@@ -150,6 +151,7 @@ const fmt = (n) => n.toLocaleString();
         const g = nextUnplayed(state);
         if (predOn() && !state.predictions.has(g.id)) lockPrediction(state, g.id, { n: predSims() });
         const r = rollAndRecord(state, g.id, seed()); await persist();
+        if (dayDone(state, g.day)) { location.href = `recap.html?day=${g.day}`; return; }
         last = { title: "Last game", rows: [{ id: g.id, a: g.a, b: g.b, ptsA: r.ptsA, ptsB: r.ptsB, ot: r.ot }] };
         await render();
         document.getElementById("status").textContent = "Game recorded and saved.";
@@ -244,10 +246,10 @@ const fmt = (n) => n.toLocaleString();
           ${played ? `<p class="muted" style="margin:10px 0 0;font-size:.88rem"><b class="${"up"}">Final${r.ot ? ` (${r.ot > 1 ? r.ot : ""}OT)` : ""}, logged to the season.</b> FG ${st("FGM", "FGA", r.boxA)} / ${st("FGM", "FGA", r.boxB)} &middot; 3P ${st("TPM", "TPA", r.boxA)} / ${st("TPM", "TPA", r.boxB)} &middot; FT ${st("FTM", "FTA", r.boxA)} / ${st("FTM", "FTA", r.boxB)} &middot; REB ${r.boxA.OR + r.boxA.DR} / ${r.boxB.OR + r.boxB.DR} &middot; TO ${r.boxA.TO} / ${r.boxB.TO}</p>` : ""}
           ${pred ? `<p class="faint" style="margin:8px 0 0;font-size:.82rem">Prediction locked before tip-off (${pred.sims.toLocaleString()} sims, kept separate from the game): ${esc(teams[g.a].name)} ${pc(pred.pA)}, ${esc(teams[g.b].name)} ${pc(1 - pred.pA)}, expected margin ${pred.margin >= 0 ? "+" : ""}${pred.margin.toFixed(1)} for ${esc(teams[g.a].name)}. The game itself is one roll.</p>` : ""}
           <div class="btn-row" style="margin-top:14px">
-            ${played ? `<button class="btn" id="gdNext" type="button" title="Enter">Load next game</button>` : `<button class="btn" id="gdPlay" type="button" title="Enter">Play game</button>`}
+            ${played && dayDone(state, g.day) ? `<button class="btn warm" id="gdNext" type="button" title="Enter">Day ${g.day} is finished: see the recap</button>` : played ? `<button class="btn" id="gdNext" type="button" title="Enter">Load next game</button>` : `<button class="btn" id="gdPlay" type="button" title="Enter">Play game</button>`}
             <span style="display:inline-flex;gap:6px;align-items:center"><input type="number" id="gdId" placeholder="Game #" style="width:110px" aria-label="Game number"><button class="btn ghost" id="gdLoad" type="button">Load</button></span>
           </div>
-          <p class="status" id="gdStatus" aria-live="polite">${played ? `<span id="gdPrev" hidden>${r.ptsA}-${r.ptsB}</span>` : ""}${logged ? `${logged} played this session. ` : ""}Enter = ${played ? "load next game" : "play this game"}.</p>`;
+          <p class="status" id="gdStatus" aria-live="polite">${played ? `<span id="gdPrev" hidden>${r.ptsA}-${r.ptsB}</span>` : ""}${logged ? `${logged} played this session. ` : ""}Enter = ${played ? (dayDone(state, g.day) ? "see the day's recap" : "load next game") : "play this game"}.</p>`;
         const pb = box.querySelector("#gdPlay"); if (pb) pb.onclick = play;
         const nb = box.querySelector("#gdNext"); if (nb) nb.onclick = next;
         box.querySelector("#gdLoad").onclick = () => { const v = parseInt(box.querySelector("#gdId").value, 10); if (v) load(v); };
@@ -270,6 +272,7 @@ const fmt = (n) => n.toLocaleString();
       async function next() {
         if (busyNow) return;
         const wasDay = cur && cur.g ? cur.g.day : null, nx = nextUnplayed(state);
+        if (wasDay != null && cur.r && dayDone(state, wasDay)) { location.href = `recap.html?day=${wasDay}`; return; }
         // a finished day, a new tournament round or the end of the season changes the rest of the page: redraw it all
         if (!nx || nx.day !== wasDay) { await render(); return; }
         load();

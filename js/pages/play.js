@@ -7,12 +7,21 @@ import { suggestField, validateField } from "../league/field.js";
 import { lockDay, lockPrediction, DEFAULT_SIMS } from "../league/predictions.js";
 import { dayDone } from "../league/recap.js";
 import { downloadSeasonExport } from "../export-download.js";
+import { startWatch } from "../watch-view.js";
 import { saveOverlay, clearOverlay, exportAll, importAll, loadOverlay, unsavedSince, protectStorage } from "../league/store.js";
 
 const seed = () => crypto.getRandomValues(new Uint32Array(1))[0];
 const predOn = () => { try { return localStorage.getItem("hw-pred-on") !== "0"; } catch { return true; } };
 const predSims = () => { try { return +localStorage.getItem("hw-pred-sims") || DEFAULT_SIMS; } catch { return DEFAULT_SIMS; } };
 const fmt = (n) => n.toLocaleString();
+// One seed per game until it is logged: Play game, Watch game and "leave and come back" are all the same game.
+const pendKey = (sid) => `hw-pending-${sid}`;
+const pendingSeed = (sid, gid) => {
+  try { const p = JSON.parse(localStorage.getItem(pendKey(sid)) || "null"); if (p && p.id === gid) return p.seed; } catch { /* ignore */ }
+  const sd = seed(); try { localStorage.setItem(pendKey(sid), JSON.stringify({ id: gid, seed: sd })); } catch { /* ignore */ }
+  return sd;
+};
+const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } catch { /* ignore */ } };
 
 (async function main() {
   const view = shell("play");
@@ -277,11 +286,12 @@ const fmt = (n) => n.toLocaleString();
           ${played ? `<p class="muted" style="margin:10px 0 0;font-size:.88rem"><b class="${"up"}">Final${r.ot ? ` (${r.ot > 1 ? r.ot : ""}OT)` : ""}, logged to the season.</b> FG ${st("FGM", "FGA", r.boxA)} / ${st("FGM", "FGA", r.boxB)} &middot; 3P ${st("TPM", "TPA", r.boxA)} / ${st("TPM", "TPA", r.boxB)} &middot; FT ${st("FTM", "FTA", r.boxA)} / ${st("FTM", "FTA", r.boxB)} &middot; REB ${r.boxA.OR + r.boxA.DR} / ${r.boxB.OR + r.boxB.DR} &middot; TO ${r.boxA.TO} / ${r.boxB.TO}</p>` : ""}
           ${pred ? `<p class="faint" style="margin:8px 0 0;font-size:.82rem">Prediction locked before tip-off (${pred.sims.toLocaleString()} sims, kept separate from the game): ${esc(teams[g.a].name)} ${pc(pred.pA)}, ${esc(teams[g.b].name)} ${pc(1 - pred.pA)}, expected margin ${pred.margin >= 0 ? "+" : ""}${pred.margin.toFixed(1)} for ${esc(teams[g.a].name)}. The game itself is one roll.</p>` : ""}
           <div class="btn-row" style="margin-top:14px">
-            ${played && dayDone(state, g.day) ? `<button class="btn warm" id="gdNext" type="button" title="Enter">Day ${g.day} is finished: see the recap</button>` : played ? `<button class="btn" id="gdNext" type="button" title="Enter">Load next game</button>` : `<button class="btn" id="gdPlay" type="button" title="Enter">Play game</button>`}
+            ${played && dayDone(state, g.day) ? `<button class="btn warm" id="gdNext" type="button" title="Enter">Day ${g.day} is finished: see the recap</button>` : played ? `<button class="btn" id="gdNext" type="button" title="Enter">Load next game</button>` : `<button class="btn" id="gdPlay" type="button" title="Enter">Play game</button><button class="btn warm" id="gdWatch" type="button" title="W">Watch game</button>`}
             <span style="display:inline-flex;gap:6px;align-items:center"><input type="number" id="gdId" placeholder="Game #" style="width:110px" aria-label="Game number"><button class="btn ghost" id="gdLoad" type="button">Load</button></span>
           </div>
-          <p class="status" id="gdStatus" aria-live="polite">${played ? `<span id="gdPrev" hidden>${r.ptsA}-${r.ptsB}</span>` : ""}${logged ? `${logged} played this session. ` : ""}Enter = ${played ? (dayDone(state, g.day) ? "see the day's recap" : "load next game") : "play this game"}.</p>`;
+          <p class="status" id="gdStatus" aria-live="polite">${played ? `<span id="gdPrev" hidden>${r.ptsA}-${r.ptsB}</span>` : ""}${logged ? `${logged} played this session. ` : ""}Enter = ${played ? (dayDone(state, g.day) ? "see the day's recap" : "load next game") : "play this game, W = watch it"}.</p>`;
         const pb = box.querySelector("#gdPlay"); if (pb) pb.onclick = play;
+        const wb = box.querySelector("#gdWatch"); if (wb) wb.onclick = watch;
         const nb = box.querySelector("#gdNext"); if (nb) nb.onclick = next;
         box.querySelector("#gdLoad").onclick = () => { const v = parseInt(box.querySelector("#gdId").value, 10); if (v) load(v); };
       }
@@ -289,16 +299,40 @@ const fmt = (n) => n.toLocaleString();
         if (busyNow || !cur || !cur.g || cur.r) return;
         busyNow = true;
         try {
-          const g = cur.g, r = rollGame(state, g.id, seed());   // ONE game, one engine run
+          const g = cur.g, r = rollGame(state, g.id, pendingSeed(season.id, g.id));   // ONE game, one engine run
           recordRolled(state, g.id, r);                          // logged to the season: results, box score, ratings
           await persist();
-          cur.r = r; logged++;
+          clearPending(season.id); cur.r = r; logged++;
           last = { title: "Played on the Game desk", rows: [{ id: g.id, a: g.a, b: g.b, ptsA: r.ptsA, ptsB: r.ptsB, ot: r.ot }, ...((last && last.title === "Played on the Game desk") ? last.rows : [])].slice(0, 25) };
           const kp = document.getElementById("kPlayed"); if (kp) kp.textContent = fmt(state.games.filter((x) => x.ptsA != null).length);
           const kt = document.getElementById("kTotal"); if (kt) kt.textContent = `of ${fmt(state.games.length)}`;
           draw();
         } catch (e) { const s = box.querySelector("#gdStatus"); if (s) s.textContent = "Could not play: " + e.message; }
         busyNow = false;
+      }
+      let viewer = null;
+      function watch() {
+        if (busyNow || !cur || !cur.g || cur.r) return;
+        const g = cur.g, A = teams[g.a], B = teams[g.b], sd = pendingSeed(season.id, g.id);
+        const r = rollGame(state, g.id, sd, calc(state), { keepLog: true });   // the same single roll Play game would make, with its play log
+        const la = lineOf(g.a), lb = lineOf(g.b);
+        const ctx = g.type === "NCAA" ? g.ctx : g.type === "CT" ? `${g.ctx} tournament` : g.type === "Conf" ? `${teams[g.a].conf} conference game` : "Non-conference";
+        const hfa = state.S.settings.hfa || 3.7;
+        busyNow = false;
+        viewer = startWatch(box, {
+          game: g, A, B, result: r, expMargin: (la.rating - lb.rating) - (g.home ? hfa : 0),
+          records: { A: `${la.rec} · ${la.conf} conf · ${la.rank ? "#" + la.rank : "unranked"}`, B: `${lb.rec} · ${lb.conf} conf · ${lb.rank ? "#" + lb.rank : "unranked"}` },
+          header: { title: `Game ${g.id}`, sub: `Day ${g.day} · ${ctx} · ${g.home ? "at " + B.name : "neutral site"}` },
+          onFinish: async () => {                      // runs once, when the broadcast ends: logged exactly like Play game
+            recordRolled(state, g.id, r); await persist(); clearPending(season.id);
+            cur.r = r; logged++;
+            last = { title: "Played on the Game desk", rows: [{ id: g.id, a: g.a, b: g.b, ptsA: r.ptsA, ptsB: r.ptsB, ot: r.ot }, ...((last && last.title === "Played on the Game desk") ? last.rows : [])].slice(0, 25) };
+            const kp = document.getElementById("kPlayed"); if (kp) kp.textContent = fmt(state.games.filter((x) => x.ptsA != null).length);
+            const kt = document.getElementById("kTotal"); if (kt) kt.textContent = `of ${fmt(state.games.length)}`;
+            syncPreview();
+          },
+          onNext: () => { if (viewer) viewer.stop(); viewer = null; next(); },
+        });
       }
       async function next() {
         if (busyNow) return;
@@ -309,6 +343,8 @@ const fmt = (n) => n.toLocaleString();
         load();
       }
       document.onkeydown = (e) => {
+        if (box.dataset.watching === "1" || (viewer && box.querySelector("#wvFinal"))) return;
+        if (document.getElementById("gameDesk") && (e.key === "w" || e.key === "W") && !e.target.closest("input, textarea, button, [role=combobox], a") && !document.querySelector("dialog[open]") && cur && cur.g && !cur.r) { e.preventDefault(); watch(); return; }
         if (!document.getElementById("gameDesk") || e.key !== "Enter" || e.target.closest("input, textarea, button, [role=combobox], a") || document.querySelector("dialog[open]")) return;
         e.preventDefault();
         if (cur && cur.g && !cur.r) play(); else next();

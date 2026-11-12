@@ -28,6 +28,7 @@ const NAV = [
   ["bracketology", "Bracketology", "bracketology.html", "bracket"],
   ["bracket", "March Madness", "bracket.html", "bracket"],
   ["news", "Articles", "news.html", "news"],
+  ["stats", "Stats", "stats.html", "rank"],
   ["history", "History", "history.html", "hist"],
   ["predictions", "Predictions", "predictions.html", "target"],
   ["play", "Commissioner", "play.html", "play"],

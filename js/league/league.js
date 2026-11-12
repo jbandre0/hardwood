@@ -108,12 +108,12 @@ export function engineRow(state, c, id) {
 export const venueOf = (g) => (g.home === 0 ? "neutral" : "B_home");
 
 /** Roll a scheduled game without recording it. */
-export function rollGame(state, gameId, seed, c = calc(state)) {
+export function rollGame(state, gameId, seed, c = calc(state), { keepLog = false } = {}) {
   const g = state.byId.get(gameId);
   if (!g) throw new Error(`Game ${gameId} is not on the schedule`);
   if (g.ptsA != null) throw new Error(`Game ${gameId} is already recorded`);
   if (g.a == null || g.b == null) throw new Error(`Game ${gameId} has no teams yet`);
-  return playRecordedGame(engineRow(state, c, g.a), engineRow(state, c, g.b), venueOf(g), { seed });
+  return playRecordedGame(engineRow(state, c, g.a), engineRow(state, c, g.b), venueOf(g), { seed, keepLog });
 }
 
 const boxRow = (id, r) => [id, r.ot, ...["FGM", "FGA", "TPM", "TPA", "FTM", "FTA", "OR", "DR", "TO", "ST", "POSS"].map((k) => r.boxA[k]),

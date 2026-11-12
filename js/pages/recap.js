@@ -1,5 +1,6 @@
 import { shell, fail } from "../ui.js";
-import { loadCore, esc, teamLink, signed, roundOf } from "../data.js";
+import { loadCore, loadAllSeasons, esc, teamLink, signed, roundOf } from "../data.js";
+import { gameRows, brokenOn } from "../league/leaders.js";
 import { dayRecap, dayDone } from "../league/recap.js";
 
 (async function main() {
@@ -45,8 +46,20 @@ import { dayRecap, dayDone } from "../league/recap.js";
             ${R.highest ? `<p style="margin:0"><span class="faint">Highest scoring</span><br>${esc(teams[R.highest.a].name)} ${R.highest.ptsA}, ${esc(teams[R.highest.b].name)} ${R.highest.ptsB} (${R.highest.ptsA + R.highest.ptsB} points)</p>` : ""}</div>
         </div>
       </div>
+      <div id="records"></div>
       <div class="card plain"><div class="card-head"><h2>Every result</h2><span class="muted">${R.games.length} games</span></div>
         <div class="table-wrap"><table><tbody>${R.games.map(score).join("")}</tbody></table></div></div>`;
+    // league records set today, against every game ever played in the league (all seasons)
+    loadAllSeasons().then((all) => {
+      const seasons = all.map((x) => ({ label: x.label, rows: gameRows(x.core.state, x.label) }));
+      const broken = brokenOn(seasons, season.label, day);
+      const box = document.getElementById("records"); if (!box || !broken.length) return;
+      const nm = (id) => esc(teams[id].name);
+      box.innerHTML = `<div class="card" style="margin-bottom:18px;border-color:var(--warm)"><div class="card-head"><h2>New league record${broken.length > 1 ? "s" : ""}</h2><a href="stats.html?tab=records" class="muted">Records book</a></div>
+        ${broken.map((b) => { const r = b.entry.row, w = r.ptsA > r.ptsB ? r.a : r.b, who = b.entry.team != null ? nm(b.entry.team) : (b.key === "margin" ? `${nm(w)} over ${nm(w === r.a ? r.b : r.a)}` : `${nm(r.a)} vs ${nm(r.b)}`);
+          const pr = b.previous, pw = pr ? (pr.row.ptsA > pr.row.ptsB ? pr.row.a : pr.row.b) : null;
+          return `<div style="display:grid;grid-template-columns:1fr auto;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)"><span><span class="pill warm">RECORD</span> <b>${esc(b.title)}</b><br><span class="muted" style="font-size:.88rem">${who}, ${r.ptsA}-${r.ptsB}${pr ? `. Old mark: ${pr.text}, ${pr.team != null ? esc(teams[pr.team].name) : esc(teams[pr.row.a].name) + " vs " + esc(teams[pr.row.b].name)} (${esc(pr.row.label)}, day ${pr.row.day}).` : ""}</span></span><b class="num" style="font-size:1.4rem">${b.entry.text}</b></div>`; }).join("")}</div>`;
+    }).catch(() => {});
     document.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.target.closest("input, textarea, a, button, [role=combobox]")) { e.preventDefault(); location.href = "play.html"; } });
   } catch (e) { fail(view, e); }
 })();

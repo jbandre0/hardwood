@@ -20,6 +20,7 @@ Reads cached cell values only (no macros). Writes `data/league.json`, `data/seas
 - Everything done on the site (games played, predictions, AP ballots, Power Poll snapshots, bracketology weeks, articles, the NCAA field, offseason choices) is saved in the browser (IndexedDB, localStorage fallback) as an overlay on top of the baseline.
 - Seasons created in the Offseason live in the browser too (key `base:<id>`), next to the season list (`meta:seasons`).
 - Every bracketology export carries a full backup; the bracketology session saves it to `data/backups/latest.json` (git history keeps every week), and the Commissioner desk can restore it on any browser.
+- **Automatic backup folder** (Chrome/Edge, Commissioner desk): choose a folder on your computer once; after every finished day (and on demand) the site writes `hardwood-latest.json` plus one file per day there (newest 12 kept). Restore with "Restore from backup". Chrome asks permission again each visit unless you pick "Allow on every visit".
 - **Commissioner desk, Download backup** writes all of it to one JSON file; **Restore from backup** puts it back. Back up after every session.
 
 ## The season loop
@@ -27,7 +28,8 @@ Reads cached cell values only (no macros). Writes `data/league.json`, `data/seas
 2. Rankings: cast the weekly AP ballot (a Power Poll snapshot is saved with it). Bracketology: suggest and save the weekly field. Articles: draft the weekly column from the numbers, edit, publish.
 3. After day 47: Build NCAA field (conference champions get the auto-bids; the rest from the Bracketology Board), then play days 48-54.
 4. Bracketology editions: Export for bracketology (Bracketology page or Commissioner desk), attach the file in a Claude session with this repo and say "do bracketology". The repo skill `.claude/skills/bracketology` reads the season (`tools/bracketology_brief.mjs`), writes the field and article, validates and publishes with `tools/publish_edition.mjs` into `data/editions.json`, and pushes to `main`. A published edition wins over anything made in the browser for that week.
-5. Offseason: awards, tier review with overrides, settings, marquee games, then create the next season (a backup downloads first).
+5. Bracket challenge: once the NCAA field is built (after day 47), fill in your own 67-game bracket on the Bracket Challenge page (open until day 48 is played). The bracketology session files Bracketology HQ's entry (`tools/publish_challenge.mjs` into `data/challenge.json`); two bots (chalk, power ratings) play too. It scores 5/10/20/40/80/160/320 by round plus a seed-gap upset bonus.
+6. Offseason: awards, tier review with overrides, settings, marquee games, then create the next season (a backup downloads first).
 
 ## Tests
 ```bash
@@ -38,6 +40,8 @@ node tests/e2e/runner.cjs                    # play a day, reload, undo, backup,
 node tests/e2e/recap.cjs                     # finishing a day opens its recap
 node tests/e2e/backup.cjs                    # export with backup, save to repo, restore in a new browser
 node tests/e2e/watch.cjs                     # Watch mode: same game, logged once
+node tests/e2e/challenge.cjs                 # bracket challenge: fill, change, persist, score
+node tests/e2e/folder.cjs                    # automatic folder backups (stand-in folder)
 node tests/e2e/gamedesk.cjs                  # Game desk: preview, play + log, load next with Enter
 node tests/e2e/season.cjs                    # play Season 2 to a champion
 node tests/e2e/lifecycle.cjs                 # ballot, column, full season, predictions, offseason, Season 3 (~6 min)

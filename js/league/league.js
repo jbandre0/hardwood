@@ -16,6 +16,8 @@ export async function loadSeasonData(id, loader, files = FILES) {
   out.league = await loader("data/league.json");
   // weekly bracketology editions published to the repo (data/editions.json, keyed by season id)
   try { out.editions = ((await loader("data/editions.json")) || {})[id] || []; } catch { out.editions = []; }
+  // Bracketology HQ's bracket-challenge entry (data/challenge.json, keyed by season id)
+  try { out.challenge = ((await loader("data/challenge.json")) || {})[id] || null; } catch { out.challenge = null; }
   return out;
 }
 

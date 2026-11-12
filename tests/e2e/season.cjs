@@ -13,7 +13,7 @@ let pass = 0, fail = 0; const ok = (c, m) => { c ? pass++ : (fail++, console.log
     if (await p.locator('#lockField').count()) { await p.click('#lockField'); fieldDone = true;  await p.waitForFunction(() => /field set/i.test(document.getElementById('status')?.textContent || ''), null, { timeout: 30000 }); continue; }
     if (!(await p.locator('#playDay').count())) break;
     const label = await p.locator('#playDay').innerText(); const day = +label.match(/day (\d+)/)[1];
-    await p.click('#playDay'); await p.waitForFunction((d) => { const t = document.querySelector('main').innerText; return new RegExp('Day ' + d + ' results', 'i').test(t); }, day, { timeout: 60000 }); days++;
+    await p.click('#playDay'); await p.waitForURL(/recap\.html/, { timeout: 120000 }); await p.goto(BASE + 'play.html', { waitUntil: 'networkidle' }); days++;
   }
   ok(fieldDone, 'NCAA field built when conference tournaments finished');
   ok(/season is over/i.test(await p.locator('main').innerText()), 'desk reports the season is over');

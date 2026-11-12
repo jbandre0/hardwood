@@ -8,6 +8,7 @@ import { lockDay, lockPrediction, DEFAULT_SIMS } from "../league/predictions.js"
 import { dayDone } from "../league/recap.js";
 import { downloadSeasonExport } from "../export-download.js";
 import { startWatch } from "../watch-view.js";
+import { folderSupported, pickFolder, forgetFolder, savedFolder, folderPermission, backupToFolder, autoBackup, lastBackup } from "../folder-backup.js";
 import { saveOverlay, clearOverlay, exportAll, importAll, loadOverlay, unsavedSince, protectStorage } from "../league/store.js";
 
 const seed = () => crypto.getRandomValues(new Uint32Array(1))[0];
@@ -104,6 +105,7 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
             <label style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><input type="checkbox" id="predOn" ${predOn() ? "checked" : ""}> Lock predictions before playing</label>
             <div class="field"><label for="predSims">Simulations per prediction</label><div id="cbSims"></div></div>
             <p class="faint" style="margin:8px 0 0;font-size:.8rem">More simulations = steadier numbers, slower days. 3,000 takes about 5-10 seconds a day.</p></div>`}
+          ${folderSupported() ? `<div class="card" id="folderCard"><div class="card-head"><h2>Automatic backup folder</h2></div><div id="folderBody" class="muted" style="font-size:.9rem">Checking…</div></div>` : ""}
           <div class="card">
             <div class="card-head"><h2>Backup</h2></div>
             <p class="${unsaved ? "" : "muted"}" style="margin-top:0">${unsaved ? `<b style="color:var(--warm)">${unsaved} game${unsaved === 1 ? "" : "s"} recorded since your last backup.</b>` : state.recorded.length ? "Everything recorded here is in your last backup." : "Nothing recorded on this site yet."}</p>
@@ -134,6 +136,26 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
     const busy = (on, msg) => { for (const id of ["playDay", "playOne", "undoOne", "undoDay"]) { const b = document.getElementById(id); if (b) b.disabled = on; } if (status) status.textContent = msg || ""; };
 
     protectStorage().then((st) => { const el = document.getElementById("storageState"); if (el) el.innerHTML = st === "protected" ? '<span class="up">Storage is protected</span> <span class="muted">(the browser won\'t clear it on its own)</span>' : st === "not-protected" ? '<span class="down">Storage is not protected</span> <span class="muted">(the browser may clear it if it runs low on space; bookmark the site and back up often)</span>' : '<span class="muted">This browser can\'t protect storage; back up often.</span>'; });
+    // ---- automatic backups to a folder on this computer
+    async function folderUI() {
+      const body = document.getElementById("folderBody"); if (!body) return;
+      const h = await savedFolder(), perm = await folderPermission(h, false), last = lastBackup();
+      const when = last ? `Last saved ${new Date(last.at).toLocaleString()} (${last.name}).` : "Nothing saved yet.";
+      if (!h) body.innerHTML = `<p style="margin:0 0 10px">Pick a folder on this computer (Documents is fine). After every finished day the site saves a full backup there, so clearing the browser's data can never cost you more than a day.</p><button class="btn" id="fPick" type="button">Choose a backup folder</button>`;
+      else if (perm === "granted") body.innerHTML = `<p style="margin:0 0 6px"><span class="up">Saving to <b>${esc(h.name)}</b></span> after every finished day.</p><p style="margin:0 0 10px">${esc(when)}</p><div class="btn-row"><button class="btn ghost" id="fNow" type="button">Back up now</button><button class="btn ghost" id="fPick" type="button">Change folder</button><button class="btn ghost" id="fStop" type="button">Stop</button></div>`;
+      else body.innerHTML = `<p style="margin:0 0 10px"><span class="down">Chrome needs your OK to write to <b>${esc(h.name)}</b> again.</span> It asks once per visit unless you choose "Allow on every visit".</p><div class="btn-row"><button class="btn" id="fAllow" type="button">Reconnect the folder</button><button class="btn ghost" id="fPick" type="button">Change folder</button></div>`;
+      const st = (m) => { body.querySelector(".fstatus")?.remove(); const p = document.createElement("p"); p.className = "status fstatus"; p.textContent = m; body.appendChild(p); };
+      const run = async (handle) => { try { const i = await backupToFolder(handle, { season: season.id, day: season.day }); await folderUI(); st(`Saved ${i.name} (${(i.bytes / 1e6).toFixed(1)} MB).`); } catch (e) { st("Could not save: " + e.message); } };
+      body.querySelector("#fPick")?.addEventListener("click", async () => { try { const nh = await pickFolder(); if ((await folderPermission(nh, true)) === "granted") await run(nh); else await folderUI(); } catch (e) { if (e.name !== "AbortError") st("Could not use that folder: " + e.message); } });
+      body.querySelector("#fAllow")?.addEventListener("click", async () => { if ((await folderPermission(h, true)) === "granted") await run(h); else st("Permission was not granted."); });
+      body.querySelector("#fNow")?.addEventListener("click", () => run(h));
+      body.querySelector("#fStop")?.addEventListener("click", async () => { if (confirm("Stop saving backups to this folder? Files already there stay.")) { await forgetFolder(); await folderUI(); } });
+    }
+    if (folderSupported()) {
+      folderUI();
+      // also save when the desk opens if the last backup is more than an hour old
+      const lb = lastBackup(); if (!lb || Date.now() - new Date(lb.at).getTime() > 3600e3) autoBackup({ season: season.id, day: season.day }).then((i) => { if (i) folderUI(); });
+    }
     // weekly backup saved to GitHub by the bracketology session (data/backups/latest.json)
     fetch("data/backups/latest.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((B) => {
       const el = document.getElementById("repoBackup"); if (!el || !B || B.none || !B.overlays) return;
@@ -160,7 +182,7 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
       if (v.errors.length) { document.getElementById("status").textContent = "Could not build a valid field: " + v.errors[0]; return; }
       setContent(state, "field", picks.filter((p) => p.group === "Field").map((p) => ({ team: p.team, seed: p.seed, region: p.region, ff: p.ff })));
       syncTournament(state); await persist(); await render();
-      const st2 = document.getElementById("status"); if (st2) st2.textContent = "NCAA field set. First Four is day 48.";
+      const st2 = document.getElementById("status"); if (st2) st2.innerHTML = 'NCAA field set. First Four is day 48. <a href="challenge.html" style="color:var(--accent)">The bracket challenge is open</a>: fill yours in before day 48 is played.';
     });
     document.getElementById("playDay")?.addEventListener("click", async () => {
       busy(true, `Playing day ${nextDay}…`);

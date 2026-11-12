@@ -38,8 +38,7 @@ const txt = (p) => p.locator('main').innerText();
     if (await p.locator('#lockField').count()) { await p.click('#lockField'); await p.waitForTimeout(1500); continue; }
     if (!(await p.locator('#playDay').count())) break;
     const day = +(await p.locator('#playDay').innerText()).match(/day (\d+)/)[1];
-    await p.click('#playDay');
-    await p.waitForFunction((d) => new RegExp('Day ' + d + ' results', 'i').test(document.querySelector('main').innerText), day, { timeout: 120000 }); days++;
+    await p.click('#playDay'); await p.waitForURL(/recap\.html/, { timeout: 120000 }); await p.goto(BASE + 'play.html', { waitUntil: 'networkidle' }); days++;
   }
   ok(/season is over/i.test(await txt(p)), `season played out (${days} days)`);
 
@@ -61,7 +60,7 @@ const txt = (p) => p.locator('main').innerText();
   await p.waitForURL(/play\.html/, { timeout: 60000 }); await p.waitForSelector('#playDay', { timeout: 60000 });
   ok(/Season 3/.test(await p.locator('#seasonSel').inputValue()), 'Season 3 is now the active season');
   ok(/Play day 1/.test(await txt(p)), 'Season 3 starts at day 1');
-  await p.click('#playDay'); await p.waitForFunction(() => /Day 1 results/i.test(document.querySelector('main').innerText), null, { timeout: 120000 });
+  await p.click('#playDay'); await p.waitForURL(/recap\.html\?day=1$/, { timeout: 120000 }); await p.waitForSelector('h1');
   ok(true, 'Season 3 day 1 played');
 
   // 6) history across three seasons; season 2 now closed

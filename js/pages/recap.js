@@ -1,6 +1,7 @@
 import { shell, fail } from "../ui.js";
 import { loadCore, loadAllSeasons, esc, teamLink, signed, roundOf } from "../data.js";
 import { gameRows, brokenOn } from "../league/leaders.js";
+import { autoBackup } from "../folder-backup.js";
 import { dayRecap, dayDone } from "../league/recap.js";
 
 (async function main() {
@@ -49,6 +50,8 @@ import { dayRecap, dayDone } from "../league/recap.js";
       <div id="records"></div>
       <div class="card plain"><div class="card-head"><h2>Every result</h2><span class="muted">${R.games.length} games</span></div>
         <div class="table-wrap"><table><tbody>${R.games.map(score).join("")}</tbody></table></div></div>`;
+    // a finished day: save a backup to the chosen folder (silently skipped if none is connected or Chrome wants a click)
+    autoBackup({ season: season.id, day }).then((i) => { if (i) { const n = document.createElement("p"); n.className = "faint"; n.style.cssText = "margin:-8px 0 14px;font-size:.82rem"; n.textContent = `Backup saved to ${i.folder} (${i.name}).`; const t = document.querySelector(".page-title"); if (t) t.after(n); } });
     // league records set today, against every game ever played in the league (all seasons)
     loadAllSeasons().then((all) => {
       const seasons = all.map((x) => ({ label: x.label, rows: gameRows(x.core.state, x.label) }));

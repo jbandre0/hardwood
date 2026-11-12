@@ -70,9 +70,9 @@ const fmt = (n) => n.toLocaleString();
             <div class="table-wrap"><table><tbody>${last.rows.map(resultRow).join("")}</tbody></table></div>
             <p class="faint" style="margin:10px 0 0;font-size:.82rem">Click a game for its box score.</p></div>` : ""}
 
-          ${dayGames.length ? `<div class="card plain"><div class="card-head"><h2>Day ${nextDay} preview</h2><span class="muted">${dayGames.length} games, by rating gap</span></div>
-            <div class="table-wrap"><table><thead><tr><th>Visitor</th><th>Host</th><th>Site</th><th class="r">Favorite</th></tr></thead><tbody>
-              ${dayGames.map((g) => ({ g, f: fav(g) })).sort((x, y) => x.f[1] - y.f[1]).map(({ g, f }) => `<tr><td>${teamLink(teams[g.a])}</td><td>${teamLink(teams[g.b])}</td><td class="muted">${g.home ? "Host" : "Neutral"}</td><td class="r"><span class="muted">${esc(f[0].name)}</span> <b class="num">+${f[1].toFixed(1)}</b></td></tr>`).join("")}
+          ${dayGames.length ? `<div class="card plain" id="dayPreview"><div class="card-head"><h2>Day ${nextDay} preview</h2><span class="muted"><span id="dpLeft">${dayGames.length}</span> games left, in playing order</span></div>
+            <div class="table-wrap"><table><thead><tr><th class="r">Game</th><th>Visitor</th><th>Host</th><th>Site</th><th class="r">Favorite</th></tr></thead><tbody>
+              ${dayGames.map((g) => { const f = fav(g); return `<tr data-gid="${g.id}"><td class="r num muted">${g.id}</td><td>${teamLink(teams[g.a])}</td><td>${teamLink(teams[g.b])}</td><td class="muted">${g.home ? "Host" : "Neutral"}</td><td class="r"><span class="muted">${esc(f[0].name)}</span> <b class="num">+${f[1].toFixed(1)}</b></td></tr>`; }).join("")}
             </tbody></table></div></div>` : ""}
 
           ${mine.length ? `<div class="card plain"><div class="card-head"><h2>Recorded on this site</h2><span class="muted">latest ${mine.length} of ${state.recorded.length}</span></div>
@@ -230,7 +230,13 @@ const fmt = (n) => n.toLocaleString();
         const form = s.last10 || "";
         return { t, rec: `${s.W}-${s.L}`, conf: `${s.confW}-${s.confL}`, rank: s.rank, rating: s.GP ? s.rating : s.tierRating, streak: s.streak || "", form, home: s.home, away: s.away };
       };
+      function syncPreview() {
+        const tb = document.querySelector("#dayPreview tbody"); if (!tb) return;
+        tb.querySelectorAll("tr[data-gid]").forEach((tr) => { const g = state.byId.get(+tr.dataset.gid); if (!g || g.ptsA != null) tr.remove(); else tr.classList.toggle("on-deck", !!(cur && cur.g && cur.g.id === g.id && !cur.r)); });
+        const left = document.getElementById("dpLeft"); if (left) left.textContent = tb.querySelectorAll("tr[data-gid]").length;
+      }
       function draw() {
+        syncPreview();
         if (!cur) { box.innerHTML = `<div class="card-head"><h2>Game desk</h2></div><p class="muted" style="margin:0">No game to load right now.</p>`; return; }
         if (cur.err) { box.innerHTML = `<div class="card-head"><h2>Game desk</h2></div><p class="down">${esc(cur.err)}</p><div class="btn-row"><button class="btn" id="gdNext" type="button">Load next game</button></div>`; box.querySelector("#gdNext").onclick = () => load(); return; }
         const { g, r, pred } = cur, A = lineOf(g.a), B = lineOf(g.b);

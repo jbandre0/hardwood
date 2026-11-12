@@ -12,7 +12,7 @@ test("normal CDF", () => {
 });
 
 test("statsAsOf(last day) equals the live calc; earlier days have fewer games", () => {
-  const a = statsAsOf(st, 13), b = statsAsOf(st, 10);
+  const D = data.meta.lastPlayedDay, a = statsAsOf(st, D), b = statsAsOf(st, D - 3);
   assert.ok(a.every((s, i) => Math.abs(s.rating - c.teams[i].stats.rating) < 1e-9 && s.GP === c.teams[i].stats.GP));
   assert.ok(b.reduce((x, s) => x + s.GP, 0) < a.reduce((x, s) => x + s.GP, 0));
 });

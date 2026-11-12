@@ -25,7 +25,25 @@ export const toGame = (g) => ({ id: g[0], day: g[1], type: g[2], ctx: g[3], a: g
  * Build a mutable season state from the baseline data and an optional overlay (what was recorded in this browser).
  * overlay = { games: {id: [ptsA, ptsB]}, box: {id: row}, order: [id...], meta: {id: {seed, at}}, extraGames: [rows] }
  */
+/** Which imported baseline an overlay was saved against (a new workbook import changes it). */
+export const baselineSignature = (data) => `${(data.meta && (data.meta.importedFrom || data.meta.createdFrom)) || data.id}|${data.meta && data.meta.playedGames != null ? data.meta.playedGames : ""}`;
+
+/**
+ * An overlay saved against an older import is stale: its games may collide with results that are now in the baseline.
+ * Stale overlays are not applied (nothing is deleted; the Commissioner desk offers to download or discard them).
+ */
+export function overlayIsStale(data, overlay) {
+  if (!overlay) return false;
+  if (overlay.baseline) return overlay.baseline !== baselineSignature(data);
+  const played = new Set(data.games.rows.filter((r) => r[7] != null).map((r) => r[0]));
+  return (overlay.order || []).some((id) => played.has(id));        // saved before signatures existed: stale only if it collides
+}
+
 export function createState(data, overlay = null) {
+  if (overlayIsStale(data, overlay)) {
+    const stale = { games: (overlay.order || []).length, content: Object.keys(overlay.content || {}), savedAt: overlay.savedAt || null };
+    const st = createState(data, null); st.staleOverlay = stale; return st;
+  }
   const games = data.games.rows.map(toGame);
   const box = new Map(data.box.rows.map((r) => [r[0], r]));
   const state = { data, games, byId: new Map(games.map((g) => [g.id, g])), box, S: data.settings, recorded: [], meta: {}, cache: null, extraGames: [], baseline: new Set(games.map((g) => g.id)) };
@@ -62,7 +80,7 @@ export function applyEditions(state, editions) {
 }
 
 export function toOverlay(state, extraGames = state.extraGames || []) {
-  const o = { format: 1, season: state.data.id, games: {}, box: {}, order: state.recorded.slice(), meta: {}, extraGames };
+  const o = { format: 1, season: state.data.id, baseline: baselineSignature(state.data), games: {}, box: {}, order: state.recorded.slice(), meta: {}, extraGames };
   for (const id of state.recorded) { const g = state.byId.get(id); o.games[id] = [g.ptsA, g.ptsB]; o.box[id] = state.box.get(id); o.meta[id] = state.meta[id]; }
   if (state.predictions && state.predictions.size) o.predictions = Object.fromEntries(state.predictions);
   if (state.contentDirty && state.contentDirty.size) { o.content = {}; for (const k of state.contentDirty) o.content[k] = state.content[k]; }

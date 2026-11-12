@@ -16,7 +16,7 @@ python3 -I tools/import_workbook.py "/path/to/Running-Hardwood-Live.xlsm"
 Reads cached cell values only (no macros). Writes `data/league.json`, `data/seasons/<id>/*.json`, `data/seasons/index.json` and the test fixtures in `tools/fixtures/`.
 
 ## Where data lives
-- `data/seasons/<id>/` is the baseline imported from the workbook (Season 1 complete, Season 2 through day 13).
+- `data/seasons/<id>/` is the baseline imported from the workbook (Season 1 complete, Season 2 through day 15, the last day played in Excel).
 - Everything done on the site (games played, predictions, AP ballots, Power Poll snapshots, bracketology weeks, articles, the NCAA field, offseason choices) is saved in the browser (IndexedDB, localStorage fallback) as an overlay on top of the baseline.
 - Seasons created in the Offseason live in the browser too (key `base:<id>`), next to the season list (`meta:seasons`).
 - Every bracketology export carries a full backup; the bracketology session saves it to `data/backups/latest.json` (git history keeps every week), and the Commissioner desk can restore it on any browser.

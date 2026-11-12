@@ -31,9 +31,9 @@ test("season 2: schedule is 5,475 games, 30 per team, none twice the same day", 
 test("season 2: played games and box scores line up one-to-one", () => {
   const G = season("season-2", "games").rows, B = season("season-2", "box").rows;
   const played = G.filter((g) => g[7] !== null).map((g) => g[0]).sort((a, b) => a - b);
-  assert.equal(played.length, 1290);
+  assert.equal(played.length, season("season-2", "meta").playedGames);
   assert.deepEqual(B.map((b) => b[0]).sort((a, b) => a - b), played);
-  assert.equal(Math.max(...G.filter((g) => g[7] !== null).map((g) => g[1])), 13);
+  assert.equal(Math.max(...G.filter((g) => g[7] !== null).map((g) => g[1])), season("season-2", "meta").lastPlayedDay);
 });
 
 test("season 2: every team's W-L and points match the workbook's Team Stats", () => {

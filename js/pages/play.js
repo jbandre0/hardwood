@@ -44,6 +44,10 @@ const fmt = (n) => n.toLocaleString();
       <div class="page-title"><span class="kicker">${esc(season.label)}</span><h1>Commissioner desk</h1>
         <p>Roll games with the engine and record them. Everything you record is saved in this browser and can be backed up to a file at any time.</p></div>
 
+      ${state.staleOverlay ? `<div class="card" style="margin-bottom:18px;border-color:var(--warm)">
+        <div class="card-head"><h2>Older saved data set aside</h2></div>
+        <p style="margin-top:0">This browser has ${state.staleOverlay.games} game${state.staleOverlay.games === 1 ? "" : "s"}${state.staleOverlay.content.length ? ` and ${esc(state.staleOverlay.content.join(", "))}` : ""} saved against an older import of ${esc(season.label)}. ${esc(season.label)} now comes from the latest workbook, so that data is not being used. Nothing has been deleted.</p>
+        <div class="btn-row"><button class="btn ghost" id="staleDl" type="button">Download it first</button><button class="btn" id="staleDrop" type="button">Discard it and start fresh</button></div></div>` : ""}
       <div class="grid cols-main">
         <div class="stack">
           <div class="card">
@@ -133,6 +137,8 @@ const fmt = (n) => n.toLocaleString();
       };
     }).catch(() => {});
     document.getElementById("exportBk")?.addEventListener("click", async () => { await downloadSeasonExport(core); await render(); const b = document.getElementById("bstatus"); if (b) b.textContent = "Export downloaded (it includes a full backup)."; });
+    document.getElementById("staleDl")?.addEventListener("click", async () => { const blob = new Blob([JSON.stringify(await exportAll())], { type: "application/json" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `hardwood-old-${season.id}-data.json`; a.click(); });
+    document.getElementById("staleDrop")?.addEventListener("click", async () => { if (!confirm(`Discard the older ${season.label} data saved in this browser? The imported season is not affected.`)) return; await clearOverlay(season.id); last = null; await render(); });
     document.getElementById("predOn")?.addEventListener("change", (e) => { try { localStorage.setItem("hw-pred-on", e.target.checked ? "1" : "0"); } catch { /* ignore */ } });
     const simsBox = document.getElementById("cbSims");
     if (simsBox) combobox(simsBox, { id: "predSims", value: String(predSims()), searchable: false, options: [1000, 2000, 3000, 5000, 10000, 40000].map((n) => ({ value: String(n), label: n.toLocaleString() + (n === 40000 ? " (backtest standard, slow)" : "") })), onChange: (v) => { try { localStorage.setItem("hw-pred-sims", v); } catch { /* ignore */ } } });

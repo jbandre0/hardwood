@@ -18,7 +18,7 @@ have a reason, and say so.
 
 The season lives in the commissioner's browser, so you need their export:
 - They attach `hardwood-<season>-through-day-<N>.json` (Commissioner desk or Bracketology page, "Export for bracketology").
-- No file? Ask for it in one line. Don't guess and don't work from the repo's baseline data: it stops at day 13 of Season 2.
+- No file? Ask for it in one line. Don't guess and don't work from the repo's baseline data: it stops where Excel stopped (Season 2, day 15).
 - Copy it into the scratchpad. It contains the whole season so far: every result, standings, team lines (record,
   conference record, rating, rank, SOS, Q1/Q2 wins, bad losses, last 10, streak, Board score, and each team as of the
   last edition), every AP ballot, every previous field and article.

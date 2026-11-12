@@ -2,6 +2,7 @@
 // predictions on -> cast an AP ballot -> draft + publish a weekly column -> play Season 2 to the title ->
 // offseason (override a tier) -> create Season 3 -> play its day 1 -> history and predictions pages reflect it all.
 const { chromium } = require('playwright'); const fs = require('fs');
+const META = require(__dirname + '/../../data/seasons/season-2/meta.json'), P = META.playedGames, D = META.lastPlayedDay, PF = P.toLocaleString('en-US');
 const BASE = process.env.BASE || 'http://localhost:8000/';
 let pass = 0, fail = 0; const ok = (c, m) => { c ? pass++ : (fail++, console.log('FAIL ' + m)); if (c) console.log('PASS ' + m); };
 const txt = (p) => p.locator('main').innerText();
@@ -16,9 +17,10 @@ const txt = (p) => p.locator('main').innerText();
   await p.click('#newBallot'); await p.waitForSelector('#saveBallot');
   await p.locator('.ed-dn').first().click(); await p.waitForTimeout(200);
   await p.click('#saveBallot'); await p.waitForTimeout(800);
-  ok(/Week 5/i.test(await txt(p)) && /Released after day 13/i.test(await txt(p)), 'week 5 ballot saved');
+  const NW = META.ballotsWeeks[META.ballotsWeeks.length - 1] + 1;
+  ok(new RegExp(`Week ${NW}`, 'i').test(await txt(p)) && new RegExp(`Released after day ${D}`, 'i').test(await txt(p)), `week ${NW} ballot saved`);
   await p.goto(BASE + 'rankings.html#poll', { waitUntil: 'networkidle' }); await p.waitForTimeout(500);
-  ok(/Power Poll/i.test(await txt(p)) && /Wk 5/.test(await txt(p)), 'power poll snapshot saved with the ballot');
+  ok(/Power Poll/i.test(await txt(p)) && new RegExp(`Wk ${NW}`).test(await txt(p)), 'power poll snapshot saved with the ballot');
 
   // 2) weekly column
   await p.goto(BASE + 'news.html', { waitUntil: 'networkidle' }); await p.click('#draftBtn');

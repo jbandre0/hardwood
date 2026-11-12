@@ -146,6 +146,19 @@ function baseContent(data) {
   let articles = clone((data.bracketology && data.bracketology.articles) || []);
   const commAdj = clone((data.bracketology && data.bracketology.commAdj) || []);
   const arch = data.archive;
+  if (arch && arch.pollHistory) {   // Season 1: the archive has every ballot (incl. the post-tournament week 15) and the Power Poll snapshots
+    const build = (poll) => {
+      const m = new Map();
+      for (const r of arch.pollHistory.filter((x) => x.Poll === poll)) {
+        if (!m.has(r.Week)) m.set(r.Week, { week: r.Week, afterDay: r["After Day"] ?? 54, ranks: [] });
+        m.get(r.Week).ranks[r.Rank - 1] = r["Team id"];
+      }
+      return [...m.values()].sort((a, b) => a.week - b.week);
+    };
+    const apA = build("AP"), pwA = build("Power");
+    if (apA.length > ap.length) { const pre = ap.filter((b) => !apA.some((x) => x.week === b.week)); ap.splice(0, ap.length, ...pre, ...apA); }
+    if (pwA.length > power.length) power.splice(0, power.length, ...pwA);
+  }
   if (!picks.length && arch && arch.bracketHistory) {
     picks = arch.bracketHistory.map((r) => ({ week: r.Week, group: r.Group, team: r["Team id"], seed: r.Seed, region: r.Region, bid: r.Bid, ff: r["FF Game"], bubble: r["Bubble Rank"], note: r.Note }));
   }

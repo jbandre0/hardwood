@@ -1,4 +1,5 @@
 import { shell, fail } from "../ui.js";
+import { combobox } from "../combobox.js";
 import { loadCore, esc, pct, signed, badge, byRank, teamHref } from "../data.js";
 import { playGame } from "../engine.js";
 
@@ -59,19 +60,22 @@ function histogram(h, nameA, nameB) {
     let B = pick(qs.get("b"), ranked[1]);
     let venue = VENUES.some((v) => v[0] === qs.get("v")) ? qs.get("v") : "neutral";
 
-    const opts = (sel) => ranked.map((t) => `<option value="${t.slug}"${t === sel ? " selected" : ""}>#${t.rank} ${esc(t.name)} (${esc(t.conf)})</option>`).join("");
+    const teamOpts = ranked.map((t) => ({
+      value: t.slug, label: t.name, search: `${t.name} ${t.conf} ${t.rank}`, lead: badge(t, 28),
+      html: `${badge(t, 26)}<span>${esc(t.name)}</span><span class="sub">${esc(t.conf)} &middot; #${t.rank}</span>`,
+    }));
     view.innerHTML = `
       <div class="page-title"><span class="kicker">Matchup simulator</span><h1>Tip it off</h1>
         <p>Pick any two of the 365 teams and a venue. The engine plays 40,000 games, one possession at a time, and tells you who wins and by how much.</p></div>
       <div class="card" style="margin-bottom:18px">
         <div class="versus">
-          <div class="field"><label for="selA">Team A</label><select id="selA">${opts(A)}</select></div>
+          <div class="field"><label for="selA">Team A</label><div id="cbA"></div></div>
           <div class="vs">VS</div>
-          <div class="field"><label for="selB">Team B</label><select id="selB">${opts(B)}</select></div>
+          <div class="field"><label for="selB">Team B</label><div id="cbB"></div></div>
         </div>
         <div class="btn-row" style="margin-top:16px;align-items:end">
           <div class="field" style="min-width:210px"><label for="selV">Venue</label>
-            <select id="selV">${VENUES.map(([v, l]) => `<option value="${v}"${v === venue ? " selected" : ""}>${l}</option>`).join("")}</select></div>
+            <div id="cbV"></div></div>
           <button class="btn ghost" id="swap" type="button">Swap teams</button>
           <button class="btn ghost" id="rand" type="button">Random matchup</button>
         </div>
@@ -79,7 +83,10 @@ function histogram(h, nameA, nameB) {
       <div id="out"></div>`;
 
     const out = document.getElementById("out");
-    const selA = document.getElementById("selA"), selB = document.getElementById("selB"), selV = document.getElementById("selV");
+    const pickTeam = (slug) => core.bySlug.get(slug);
+    const cbA = combobox(document.getElementById("cbA"), { id: "selA", options: teamOpts, value: A.slug, placeholder: "Type a team", onChange: (v) => { A = pickTeam(v); update(); } });
+    const cbB = combobox(document.getElementById("cbB"), { id: "selB", options: teamOpts, value: B.slug, placeholder: "Type a team", onChange: (v) => { B = pickTeam(v); update(); } });
+    const cbV = combobox(document.getElementById("cbV"), { id: "selV", options: VENUES.map(([v, l]) => ({ value: v, label: l })), value: venue, searchable: false, onChange: (v) => { venue = v; update(); } });
 
     // ---- worker with stale-result protection ----
     let worker, runId = 0;
@@ -170,14 +177,11 @@ function histogram(h, nameA, nameB) {
     }
 
     const update = (() => { let t; return () => { clearTimeout(t); t = setTimeout(run, 60); }; })();
-    selA.onchange = () => { A = core.bySlug.get(selA.value); update(); };
-    selB.onchange = () => { B = core.bySlug.get(selB.value); update(); };
-    selV.onchange = () => { venue = selV.value; update(); };
-    document.getElementById("swap").onclick = () => { [A, B] = [B, A]; selA.value = A.slug; selB.value = B.slug; if (venue !== "neutral") { venue = venue === "A_home" ? "B_home" : "A_home"; selV.value = venue; } update(); };
+    document.getElementById("swap").onclick = () => { [A, B] = [B, A]; cbA.set(A.slug); cbB.set(B.slug); if (venue !== "neutral") { venue = venue === "A_home" ? "B_home" : "A_home"; cbV.set(venue); } update(); };
     document.getElementById("rand").onclick = () => {
       const r = () => core.teams[Math.floor(Math.random() * core.teams.length)];
       A = r(); do { B = r(); } while (B === A);
-      selA.value = A.slug; selB.value = B.slug; update();
+      cbA.set(A.slug); cbB.set(B.slug); update();
     };
     run();
   } catch (e) { fail(view, e); }

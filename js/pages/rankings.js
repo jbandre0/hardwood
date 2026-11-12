@@ -1,4 +1,5 @@
 import { shell, fail } from "../ui.js";
+import { combobox } from "../combobox.js";
 import { loadCore, esc, teamLink, signed, recordAsOf } from "../data.js";
 
 (async function main() {
@@ -32,16 +33,18 @@ import { loadCore, esc, teamLink, signed, recordAsOf } from "../data.js";
       const mx = Math.max(...core.teams.map((t) => t.rating)), mn = Math.min(...core.teams.map((t) => t.rating));
       panel.innerHTML = `
         <div class="btn-row" style="margin-bottom:14px">
-          <div class="field" style="min-width:200px"><label for="fc">Conference</label><select id="fc"><option value="">All conferences</option>${core.confs.map((c) => `<option${c === st.conf ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
-          <div class="field" style="min-width:140px"><label for="ft">Tier</label><select id="ft"><option value="">All tiers</option>${["S", "A", "B", "C", "D", "F"].map((c) => `<option${c === st.tier ? " selected" : ""}>${c}</option>`).join("")}</select></div>
+          <div class="field" style="min-width:200px"><label for="fc">Conference</label><div id="cbConf"></div></div>
+          <div class="field" style="min-width:140px"><label for="ft">Tier</label><div id="cbTier"></div></div>
           <div class="field" style="align-self:end"><span class="muted">${rows.length} teams</span></div>
         </div>
         <div class="table-wrap"><table><thead><tr>${COLS.map(([k, label, , al]) => `<th class="sortable ${al || ""} ${st.sort === k ? "sorted" : ""}" data-k="${k}" aria-sort="${st.sort === k ? (st.dir > 0 ? "ascending" : "descending") : "none"}">${label}${st.sort === k ? (st.dir > 0 ? " ▲" : " ▼") : ""}</th>`).join("")}</tr></thead><tbody>
           ${rows.map((t) => `<tr><td class="rank c">${t.rank}</td><td>${teamLink(t)}</td><td class="muted">${esc(t.conf)}</td><td><span class="pill">${esc(t.tier)}</span></td><td class="r num">${t.w}-${t.l}</td><td class="r num ${t.margin >= 0 ? "up" : "down"}">${signed(t.margin)}</td><td class="r num muted">${t.oppRating.toFixed(1)}</td>
             <td class="r"><div class="bar-cell" style="justify-content:flex-end"><i style="width:${Math.max(4, ((t.rating - mn) / (mx - mn)) * 70)}px"></i><span><b>${t.rating.toFixed(1)}</b></span></div></td></tr>`).join("")}
         </tbody></table></div>`;
-      panel.querySelector("#fc").onchange = (e) => { st.conf = e.target.value; power(); };
-      panel.querySelector("#ft").onchange = (e) => { st.tier = e.target.value; power(); };
+      combobox(panel.querySelector("#cbConf"), { id: "fc", value: st.conf, placeholder: "Conference", onChange: (v) => { st.conf = v; power(); },
+        options: [{ value: "", label: "All conferences" }, ...core.confs.map((c) => ({ value: c, label: c }))] });
+      combobox(panel.querySelector("#cbTier"), { id: "ft", value: st.tier, searchable: false, onChange: (v) => { st.tier = v; power(); },
+        options: [{ value: "", label: "All tiers" }, ...["S", "A", "B", "C", "D", "F"].map((c) => ({ value: c, label: "Tier " + c }))] });
       panel.querySelectorAll("th.sortable").forEach((th) => th.onclick = () => {
         const k = th.dataset.k;
         if (st.sort === k) st.dir *= -1; else { st.sort = k; st.dir = ["rank", "name", "conf", "tier"].includes(k) ? 1 : -1; }

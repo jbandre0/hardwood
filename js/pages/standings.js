@@ -1,4 +1,5 @@
 import { shell, fail } from "../ui.js";
+import { combobox } from "../combobox.js";
 import { loadCore, esc, teamLink, signed } from "../data.js";
 
 (async function main() {
@@ -12,7 +13,7 @@ import { loadCore, esc, teamLink, signed } from "../data.js";
       <div class="page-title"><span class="kicker">Season 1 final</span><h1>Standings</h1>
         <p>Teams sort by conference win percentage, then overall win percentage, then scoring margin. Conference tournament results sit underneath.</p></div>
       <div class="card" style="margin-bottom:18px"><div class="field" style="max-width:320px"><label for="conf">Conference</label>
-        <select id="conf">${core.confs.map((c) => `<option${c === conf ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></div></div>
+        <div id="cbConf"></div></div></div>
       <div id="out"></div>`;
     const out = document.getElementById("out");
 
@@ -43,7 +44,7 @@ import { loadCore, esc, teamLink, signed } from "../data.js";
                 <span class="num muted">${Math.max(g.ptsA, g.ptsB)}-${Math.min(g.ptsA, g.ptsB)}</span></div>`).join("")}</div>`;
           }).join("")}</div></div>` : ""}`;
     }
-    document.getElementById("conf").onchange = (e) => { conf = e.target.value; draw(); };
+    combobox(document.getElementById("cbConf"), { id: "conf", value: conf, placeholder: "Conference", options: core.confs.map((c) => ({ value: c, label: c })), onChange: (v) => { conf = v; draw(); } });
     draw();
   } catch (e) { fail(view, e); }
 })();

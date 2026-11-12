@@ -47,7 +47,7 @@ const fmt = (n) => n.toLocaleString();
           <div class="card">
             <div class="kpis">
               <div class="kpi"><small>Games played</small><b>${fmt(season.played)}</b><span>of ${fmt(season.total)}</span></div>
-              <div class="kpi"><small>Latest day</small><b>${season.day}</b><span>of 42 regular-season days</span></div>
+              <div class="kpi"><small>Latest day</small><b>${season.day}</b><span>${season.day > 42 ? "of 54 (postseason)" : "of 42 regular-season days"}</span></div>
               <div class="kpi"><small>Next day</small><b>${nextDay ?? "—"}</b><span>${dayGames.length} games</span></div>
             </div>
             ${complete ? `<p class="muted" style="margin:14px 0 0">${esc(season.label)} is complete. Switch to the live season in the top bar to keep playing.</p>` :
@@ -94,11 +94,11 @@ const fmt = (n) => n.toLocaleString();
             <div class="btn-row"><button class="btn" id="exportBtn" type="button">Download backup</button><label class="btn ghost" for="importFile" style="cursor:pointer">Restore from backup</label><input id="importFile" type="file" accept="application/json,.json" hidden></div>
             <p class="status" id="bstatus" aria-live="polite"></p>
           </div>
-          <div class="card">
+          ${complete ? "" : `<div class="card">
             <div class="card-head"><h2>Start over</h2></div>
             <p class="muted" style="margin-top:0;font-size:.9rem">Removes everything recorded in this browser for ${esc(season.label)} and returns to the imported workbook state (${fmt(season.played - state.recorded.length)} games). This cannot be undone, so back up first.</p>
             <button class="btn ghost" id="discardBtn" type="button" ${state.recorded.length ? "" : "disabled"}>Discard ${state.recorded.length} recorded game${state.recorded.length === 1 ? "" : "s"}</button>
-          </div>
+          </div>`}
           <div class="card">
             <div class="card-head"><h2>How a game is played</h2></div>
             <p class="muted" style="margin:0;font-size:.9rem">Each game is one roll of the v9 engine from each team's current inputs (a blend of its season-start line and its own results, fully its own after 10 games). The host opens with the ball, home court is worth about 3 points, and overtime plays on a continuous clock. After a day, every rating is re-solved from all results.</p>

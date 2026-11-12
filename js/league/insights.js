@@ -1,8 +1,9 @@
 // Weekly insights: the numbers behind the articles. Everything here is computed from the season state; nothing is
 // written by hand. Two kinds of forecast are used and labelled as such:
 //  - "engine" what-ifs: the real v9 engine (predict(), 10,000 games) for a handful of hypothetical matchups;
-//  - "quick model" projections for the rest of the season: each remaining game's margin ~ Normal(rating gap + home
-//    edge, 13.5), the engine's own margin spread (see the known weaknesses). Fast enough to run thousands of seasons.
+//  - "quick model" projections for the rest of the season: each simulated season draws team strengths (rating shrunk
+//    toward tier, plus uncertainty that fades with games played), then each remaining game's margin ~ Normal(strength
+//    gap + home edge, 13.5), the engine's own margin spread. Fast enough to run thousands of seasons.
 import { computeSeason } from "./stats.js";
 import { makeRng, predict } from "../engine.js";
 import { engineRow } from "./league.js";
@@ -138,15 +139,22 @@ export function weeklyInsights(state, c, { from, to, sims = 2000, seed = 1, what
  */
 export function projectSeason(state, now, left, { sims = 2000, seed = 1, hfa = 3.7 } = {}) {
   const T = state.data.teams, L = state.data.league, n = L.length, rand = makeRng(seed);
-  const pB = left.map((g) => phi((now[g.b].eff - now[g.a].eff + (g.home === 0 ? 0 : hfa)) / QUICK_SD));
+  // Ratings early in a season are noisy, so each simulated season first draws every team's "true" strength: its
+  // rating shrunk toward its tier rating (weight GP / (GP + 6)) plus a team-level error that fades with games played.
+  // Without this the model treats a 7-0 team's rating as fact and hands out perfect seasons far too freely.
+  const gauss = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+  const center = now.map((s) => { const w = s.GP / (s.GP + 6); return w * s.eff + (1 - w) * s.tierRating; });
+  const spread = now.map((s) => 7 * Math.sqrt(6 / (s.GP + 6)));
+  const str = new Float64Array(n);
   const winsSum = new Float64Array(n), unbeatenEnd = new Float64Array(n), confTitle = new Float64Array(n);
   const baseW = now.map((s) => s.W), baseL = now.map((s) => s.L), baseCW = now.map((s) => s.confW), baseCL = now.map((s) => s.confL);
   const confs = new Map(); for (let id = 0; id < n; id++) { const k = T[id].conf; if (!confs.has(k)) confs.set(k, []); confs.get(k).push(id); }
   const w = new Int32Array(n), l = new Int32Array(n), cw = new Int32Array(n), clz = new Int32Array(n);
   for (let s = 0; s < sims; s++) {
     for (let id = 0; id < n; id++) { w[id] = baseW[id]; l[id] = baseL[id]; cw[id] = baseCW[id]; clz[id] = baseCL[id]; }
+    for (let id = 0; id < n; id++) str[id] = center[id] + spread[id] * gauss();
     for (let i = 0; i < left.length; i++) {
-      const g = left[i], bWins = rand() < pB[i], win = bWins ? g.b : g.a, lose = bWins ? g.a : g.b;
+      const g = left[i], bWins = rand() < phi((str[g.b] - str[g.a] + (g.home === 0 ? 0 : hfa)) / QUICK_SD), win = bWins ? g.b : g.a, lose = bWins ? g.a : g.b;
       w[win]++; l[lose]++;
       if (g.type === "Conf") { cw[win]++; clz[lose]++; }
     }
@@ -238,7 +246,7 @@ export function draftArticle(ins, { week, label } = {}) {
   // where this is headed
   if (ins.projection.gamesLeft) {
     const best = [...ins.projection.teams].sort((a, b) => b.projW - a.projW).slice(0, 3);
-    S.push(`WHERE THIS IS HEADED\nProjected final regular-season records for the top of the board: ${listAnd(best.map((t) => `${t.name} ${t.projW.toFixed(1)}-${(t.games - t.projW).toFixed(1)}`))}. ${lead ? (lead.id === best[0].id ? `${lead.name} has the longest perfect run and the ratings agree it is the team to beat.` : `${lead.name} has the longest perfect run, but the ratings say the team to beat is ${best[0].name}.`) : ""} These projections use a quick model (rating gap plus home edge, with the engine's spread of about ${QUICK_SD} points), not 40,000 engine sims per game, so treat them as a direction, not a promise.`);
+    S.push(`WHERE THIS IS HEADED\nProjected final regular-season records for the top of the board: ${listAnd(best.map((t) => `${t.name} ${t.projW.toFixed(1)}-${(t.games - t.projW).toFixed(1)}`))}. ${lead ? (lead.id === best[0].id ? `${lead.name} has the longest perfect run and the ratings agree it is the team to beat.` : `${lead.name} has the longest perfect run, but the ratings say the team to beat is ${best[0].name}.`) : ""} These projections use a quick model (ratings with their early-season uncertainty, plus home edge and the engine's spread of about ${QUICK_SD} points), not 40,000 engine sims per game, so treat them as a direction, not a promise.`);
   }
   S.push(`League scoring is running at ${ins.leagueScoring.toFixed(1)} points per team per game${ins.homeWinPct != null ? `, and home teams are winning ${pct(ins.homeWinPct)} of the time` : ""}. See you next week.`);
 

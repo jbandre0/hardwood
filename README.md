@@ -1,6 +1,6 @@
 # Hardwood Sim (website)
 
-Static site for the Hardwood Sim fantasy college basketball world: Season 1 archive, matchup simulator, rankings, standings, bracket. The engine is a JS port of the workbook's Python engine (v9).
+Static site that runs the Hardwood Sim fantasy college basketball league season after season: daily game runner, ratings, standings, polls, bracketology, weekly articles, conference tournaments, the NCAA bracket, the offseason, multi-season history and a prediction tracker. The engine is a JS port of the workbook's Python engine (v9).
 
 ## Run it
 ```bash
@@ -11,9 +11,32 @@ No build step. Plain HTML, ES modules, self-hosted fonts (Barlow, Barlow Condens
 ## Refresh the data from the workbook
 ```bash
 pip install openpyxl
-python3 -I tools/export.py "/path/to/Hardwood-Season-1-FINAL.xlsm"
+python3 -I tools/import_workbook.py "/path/to/Running-Hardwood-Live.xlsm"
 ```
-Reads cached cell values only (no macros). Writes `data/*.json` and `tools/fixtures/teams-real.json`.
+Reads cached cell values only (no macros). Writes `data/league.json`, `data/seasons/<id>/*.json`, `data/seasons/index.json` and the test fixtures in `tools/fixtures/`.
+
+## Where data lives
+- `data/seasons/<id>/` is the baseline imported from the workbook (Season 1 complete, Season 2 through day 13).
+- Everything done on the site (games played, predictions, AP ballots, Power Poll snapshots, bracketology weeks, articles, the NCAA field, offseason choices) is saved in the browser (IndexedDB, localStorage fallback) as an overlay on top of the baseline.
+- Seasons created in the Offseason live in the browser too (key `base:<id>`), next to the season list (`meta:seasons`).
+- **Commissioner desk, Download backup** writes all of it to one JSON file; **Restore from backup** puts it back. Back up after every session.
+
+## The season loop
+1. Commissioner desk: play days (predictions are locked first unless switched off). Conference tournaments (days 43-47) are generated when the regular season ends; seeding is conference win %, then head-to-head among tied teams, then margin, then overall record (inferred from Season 1's real seedings).
+2. Rankings: cast the weekly AP ballot (a Power Poll snapshot is saved with it). Bracketology: suggest and save the weekly field. Articles: draft the weekly column from the numbers, edit, publish.
+3. After day 47: Build NCAA field (conference champions get the auto-bids; the rest from the Bracketology Board), then play days 48-54.
+4. Offseason: awards, tier review with overrides, settings, marquee games, then create the next season (a backup downloads first).
+
+## Tests
+```bash
+node --test tests/*.test.mjs                 # unit tests, verified against the workbook (~66 tests)
+python3 -m http.server 8000 &                # then, in another shell:
+node tests/e2e/smoke.cjs                     # every page, both seasons, no console errors
+node tests/e2e/runner.cjs                    # play a day, reload, undo, backup, restore
+node tests/e2e/season.cjs                    # play Season 2 to a champion
+node tests/e2e/lifecycle.cjs                 # ballot, column, full season, predictions, offseason, Season 3 (~6 min)
+```
+The browser tests use a throwaway profile; none of their fake games are kept.
 
 ## Test the engine
 ```bash
@@ -40,5 +63,5 @@ Team logos live in `assets/logos/` (359 of 365 teams; six newer or renamed progr
 ## Design research
 `research/FINDINGS.md` documents the AI-vs-human design-pattern study that shaped the visual design.
 
-## Not built yet (v2)
-Prediction tracker for real 2026-27 games, polls/bracketology archive pages, live play-by-play viewer for recorded games, Season 2 offseason and history tables.
+## Not built yet
+Prediction tracker for real-world 2026-27 games (the tracker scores the sim's own games), live play-by-play viewer for recorded games, a way to delete a season created in the browser (restore an older backup instead), conference realignment between seasons (the data model allows it; there is no editor).

@@ -38,7 +38,7 @@ export function shell(page) {
     <div class="shell">
       <aside class="rail" id="rail" aria-label="Main">
         <a class="brand" href="index.html" aria-label="Hardwood Sim home">
-          <span class="brand-mark" aria-hidden="true"></span>
+          <img class="brand-logo" src="assets/brand/hardwood-mark.png" alt="" width="46" height="40">
           <span class="brand-name">Hardwood<small>Sim</small></span>
         </a>
         <nav class="nav">${nav}</nav>

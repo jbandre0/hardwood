@@ -1,7 +1,7 @@
 // Data loading + derived structures shared by every page.
 
 import { loadSeasonData, createState, calc, lastPlayedDay, playedCount } from "./league/league.js";
-import { loadOverlay } from "./league/store.js";
+import { loadOverlay, seasonMeta, loadLocalSeason } from "./league/store.js";
 
 const cache = new Map();
 export function fetchJSON(path) {
@@ -17,14 +17,29 @@ export const ROUND_BY_DAY = { 48: "First Four", 49: "First Round", 50: "Second R
 export const REGIONS = ["East", "West", "South", "Midwest"];
 
 // ---------- which season are we looking at? ----------
-export async function seasonsIndex() { return getJSON("seasons/index"); }
+let idxPromise = null;
+/** Static seasons (data/seasons/index.json) plus seasons created in this browser, with status changes applied. */
+export function seasonsIndex() {
+  if (!idxPromise) idxPromise = (async () => {
+    const base = (await getJSON("seasons/index")).map((s) => ({ ...s }));
+    let meta = { status: {}, local: [] };
+    try { meta = await seasonMeta(); } catch { /* storage blocked */ }
+    for (const id of meta.local) {
+      try { const b = await loadLocalSeason(id); if (b && b.info) base.push({ ...b.info, files: Object.keys(b.files) }); } catch { /* ignore */ }
+    }
+    for (const s of base) if (meta.status[s.id]) s.status = meta.status[s.id];
+    return base;
+  })();
+  return idxPromise;
+}
+export function resetSeasonsIndex() { idxPromise = null; }
 export async function activeSeasonId() {
   const idx = await seasonsIndex();
   const ids = idx.map((s) => s.id);
   const q = new URLSearchParams(location.search).get("s");
   if (q && ids.includes(q)) { try { localStorage.setItem("hw-season", q); } catch { /* ignore */ } return q; }
   try { const saved = localStorage.getItem("hw-season"); if (saved && ids.includes(saved)) return saved; } catch { /* ignore */ }
-  const live = idx.find((s) => s.status === "in-progress");
+  const live = [...idx].reverse().find((s) => s.status === "in-progress");
   return (live || idx[idx.length - 1]).id;
 }
 export function setActiveSeason(id) { try { localStorage.setItem("hw-season", id); } catch { /* ignore */ } }
@@ -37,13 +52,19 @@ export function loadCore(seasonId) {
   return cores.get(key);
 }
 /** Drop cached cores (after the runner changes games) so pages rebuild from the saved state. */
-export function resetCores() { cores.clear(); }
+export function resetCores() { cores.clear(); idxPromise = null; }
 
 async function buildCore(seasonId) {
   const id = seasonId || (await activeSeasonId());
   const idx = await seasonsIndex();
   const info = idx.find((s) => s.id === id);
-  const [data, overlay, logos] = await Promise.all([loadSeasonData(id, fetchJSON, info && info.files), loadOverlay(id).catch(() => null), getJSON("logos").catch(() => ({}))]);
+  let loader = fetchJSON;
+  if (info && info.local) {
+    const b = await loadLocalSeason(id);
+    if (!b) throw new Error(`${info.label} is missing from this browser's storage. Restore it from a backup file on the Commissioner desk.`);
+    loader = (p) => (p.startsWith(`data/seasons/${id}/`) ? Promise.resolve(b.files[p.slice(`data/seasons/${id}/`.length, -5)] ?? Promise.reject(new Error("missing"))) : fetchJSON(p));
+  }
+  const [data, overlay, logos] = await Promise.all([loadSeasonData(id, loader, info && info.files), loadOverlay(id).catch(() => null), getJSON("logos").catch(() => ({}))]);
   LOGOS = logos;
   const state = createState(data, overlay);
   const c = calc(state);
@@ -56,7 +77,7 @@ async function buildCore(seasonId) {
       gp: s.GP, w: s.W, l: s.L, cw: s.confW, cl: s.confL, home: s.home, away: s.away, neutral: s.neutral,
       pf: s.pfpg, pa: s.papg, margin: s.margin, oppRating: s.sos, sos: s.sos, rating: s.rating, tierRating: s.tierRating, eff: s.eff,
       rank: s.rank ?? 999, last10: s.last10 ?? "", streak: s.streak ?? "", bestWin: nm(s.bestWin), worstLoss: nm(s.worstLoss),
-      eng: [t.name, tm.conf, ...r.live], start: tm.start, final: tm.final || null,
+      eng: [t.name, tm.conf, ...r.live], start: tm.start, final: tm.final || null, prevRating: tm.prevRating ?? null,
     };
   });
   const bySlug = new Map(teams.map((t) => [t.slug, t]));
@@ -138,4 +159,15 @@ export function articleHTML(body, maxParas = Infinity) {
     } else out.push(`<p>${esc(block)}</p>`);
   }
   return out.slice(0, maxParas).join("");
+}
+
+/** Every season (static and browser-made) with its archive summary, for the history pages. Seasons load in parallel. */
+export async function loadAllSeasons() {
+  const { seasonSummary } = await import("./league/summary.js");
+  const idx = await seasonsIndex();
+  const cores = await Promise.all(idx.map((s) => loadCore(s.id).catch(() => null)));
+  return idx.map((s, i) => {
+    const c = cores[i]; if (!c) return null;
+    return { id: s.id, label: s.label, status: s.status, core: c, games: c.state.games, summary: seasonSummary(c.state, c.calc, c.league, c.ncaa.field) };
+  }).filter(Boolean);
 }

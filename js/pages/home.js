@@ -72,14 +72,14 @@ import { loadCore, articleHTML, esc, badge, teamLink, teamHref, byRank, signed, 
               ${recent.map(({ g, gap }) => `<tr><td class="muted num">${g.day}</td><td>${teamLink(teams[g.w])}</td><td>${teamLink(teams[g.l])}</td><td class="r num">${Math.max(g.ptsA, g.ptsB)}-${Math.min(g.ptsA, g.ptsB)}</td><td class="r num up">${gap.toFixed(1)}</td></tr>`).join("")}
             </tbody></table></div>` : `<p class="muted">No upsets yet on the latest days.</p>`}
           </div>`;
-      const arts = (core.data.bracketology && core.data.bracketology.articles) || [];
-      const art = arts[arts.length - 1];
+      const arts = core.state.content.articles.map((a, i) => ({ ...a, i }));
+      const art = arts.sort((a, b) => (b.to ?? b.week ?? 0) - (a.to ?? a.week ?? 0) || (a.type === "Weekly" ? -1 : 1))[0];
       reviewCard = art ? `
       <div class="card" style="margin-top:18px">
-        <div class="card-head"><h2>${esc((art.headline || "Bracketology").split(":")[0])}</h2><span class="pill mint">Week ${esc(art.week)}</span></div>
+        <div class="card-head"><h2>${esc((art.headline || "Bracketology").split(":")[0])}</h2><span class="pill mint">${art.type === "Weekly" ? "Weekly column" : "Bracketology"} &middot; Week ${esc(art.week)}</span></div>
         <p class="muted" style="margin-top:-6px">${esc(art.headline || "")}</p>
         <div class="prose wide">${articleHTML(art.body, 7)}</div>
-        <a class="btn ghost" href="bracketology.html">Bracketology</a>
+        <div class="btn-row"><a class="btn ghost" href="news.html?a=${art.i}">Read it all</a><a class="btn ghost" href="news.html">All articles</a></div>
       </div>` : "";
     }
 

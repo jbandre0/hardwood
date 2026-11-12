@@ -12,6 +12,10 @@ const I = {
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   play: '<path d="M6 4l14 8-14 8z"/>',
+  news: '<path d="M5 4h12v16H5zM17 8h3v10a2 2 0 0 1-2 2M8 8h6M8 12h6M8 16h4"/>',
+  hist: '<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8"/>',
+  target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="M12 12h.01"/>',
+  cycle: '<path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5"/>',
   theme: '<path d="M21 12.8A8.5 8.5 0 1 1 11.2 3 6.5 6.5 0 0 0 21 12.8Z"/>',
 };
 const svg = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true">${I[k]}</svg>`;
@@ -23,7 +27,11 @@ const NAV = [
   ["standings", "Standings", "standings.html", "stand"],
   ["bracketology", "Bracketology", "bracketology.html", "bracket"],
   ["bracket", "March Madness", "bracket.html", "bracket"],
+  ["news", "Articles", "news.html", "news"],
+  ["history", "History", "history.html", "hist"],
+  ["predictions", "Predictions", "predictions.html", "target"],
   ["play", "Commissioner", "play.html", "play"],
+  ["offseason", "Offseason", "offseason.html", "cycle"],
   ["about", "How it works", "about.html", "info"],
 ];
 

@@ -1,11 +1,15 @@
 import { shell, fail } from "../ui.js";
+import { combobox } from "../combobox.js";
 import { loadCore, resetCores, esc, badge, teamLink, signed } from "../data.js";
 import { rollAndRecord, playDay, undoLast, toOverlay, nextUnplayed, calc, setContent, syncTournament } from "../league/league.js";
 import { computeBoard } from "../league/bracketology.js";
 import { suggestField, validateField } from "../league/field.js";
+import { lockDay, lockPrediction, DEFAULT_SIMS } from "../league/predictions.js";
 import { saveOverlay, clearOverlay, exportAll, importAll, loadOverlay, unsavedSince } from "../league/store.js";
 
 const seed = () => crypto.getRandomValues(new Uint32Array(1))[0];
+const predOn = () => { try { return localStorage.getItem("hw-pred-on") !== "0"; } catch { return true; } };
+const predSims = () => { try { return +localStorage.getItem("hw-pred-sims") || DEFAULT_SIMS; } catch { return DEFAULT_SIMS; } };
 const fmt = (n) => n.toLocaleString();
 
 (async function main() {
@@ -76,6 +80,13 @@ const fmt = (n) => n.toLocaleString();
         </div>
 
         <div class="stack">
+          ${season.day >= 54 || complete ? `<div class="card"><div class="card-head"><h2>Offseason</h2></div><p class="muted" style="margin-top:0">Awards, the tier review and creating next season.</p><a class="btn" href="offseason.html">Open the offseason</a></div>` : ""}
+          ${complete ? "" : `<div class="card">
+            <div class="card-head"><h2>Predictions</h2><a href="predictions.html">Scorecard</a></div>
+            <p class="muted" style="margin-top:0;font-size:.9rem">Before a game is played, the engine's prediction is locked and later scored. ${state.predictions.size.toLocaleString()} locked so far.</p>
+            <label style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><input type="checkbox" id="predOn" ${predOn() ? "checked" : ""}> Lock predictions before playing</label>
+            <div class="field"><label for="predSims">Simulations per prediction</label><div id="cbSims"></div></div>
+            <p class="faint" style="margin:8px 0 0;font-size:.8rem">More simulations = steadier numbers, slower days. 3,000 takes about 5-10 seconds a day.</p></div>`}
           <div class="card">
             <div class="card-head"><h2>Backup</h2></div>
             <p class="${unsaved ? "" : "muted"}" style="margin-top:0">${unsaved ? `<b style="color:var(--warm)">${unsaved} game${unsaved === 1 ? "" : "s"} recorded since your last backup.</b>` : state.recorded.length ? "Everything recorded here is in your last backup." : "Nothing recorded on this site yet."}</p>
@@ -100,6 +111,9 @@ const fmt = (n) => n.toLocaleString();
     const persist = async () => { await saveOverlay(season.id, toOverlay(state, state.extraGames || [])); };
     const busy = (on, msg) => { for (const id of ["playDay", "playOne", "undoOne", "undoDay"]) { const b = document.getElementById(id); if (b) b.disabled = on; } if (status) status.textContent = msg || ""; };
 
+    document.getElementById("predOn")?.addEventListener("change", (e) => { try { localStorage.setItem("hw-pred-on", e.target.checked ? "1" : "0"); } catch { /* ignore */ } });
+    const simsBox = document.getElementById("cbSims");
+    if (simsBox) combobox(simsBox, { id: "predSims", value: String(predSims()), searchable: false, options: [1000, 2000, 3000, 5000, 10000, 40000].map((n) => ({ value: String(n), label: n.toLocaleString() + (n === 40000 ? " (backtest standard, slow)" : "") })), onChange: (v) => { try { localStorage.setItem("hw-pred-sims", v); } catch { /* ignore */ } } });
     document.getElementById("lockField")?.addEventListener("click", async () => {
       const c = calc(state), B = core.data.bracketology || { settings: {} }, S = { q1Rank: 25, q2Rank: 50, badLossRank: 100, winWeight: 8, q1Pts: 1.5, q2Pts: 0.75, badLossPts: 1.5, atLarge: 37, seedBump: 2, ...B.settings };
       const tm = teams.map((t) => ({ id: t.id, conf: t.conf, rating: t.rating, eff: t.eff }));
@@ -115,6 +129,13 @@ const fmt = (n) => n.toLocaleString();
       busy(true, `Playing day ${nextDay}…`);
       await new Promise((r) => setTimeout(r, 20));
       try {
+        if (predOn()) {
+          const st = document.getElementById("status");
+          const k = await lockDay(state, nextDay, { n: predSims(), onProgress: (d, t) => { if (st) st.textContent = `Locking predictions ${d} of ${t} (${predSims().toLocaleString()} sims each)…`; } });
+          if (k) await persist();
+          if (st) st.textContent = `Playing day ${nextDay}…`;
+          await new Promise((r) => setTimeout(r, 20));
+        }
         const res = playDay(state, nextDay, seed()); await persist();
         last = { title: `Day ${nextDay} results`, rows: res };
         await render();
@@ -124,7 +145,9 @@ const fmt = (n) => n.toLocaleString();
     document.getElementById("playOne")?.addEventListener("click", async () => {
       busy(true, "Rolling…");
       try {
-        const g = nextUnplayed(state), r = rollAndRecord(state, g.id, seed()); await persist();
+        const g = nextUnplayed(state);
+        if (predOn() && !state.predictions.has(g.id)) lockPrediction(state, g.id, { n: predSims() });
+        const r = rollAndRecord(state, g.id, seed()); await persist();
         last = { title: "Last game", rows: [{ id: g.id, a: g.a, b: g.b, ptsA: r.ptsA, ptsB: r.ptsB, ot: r.ot }] };
         await render();
         document.getElementById("status").textContent = "Game recorded and saved.";

@@ -30,6 +30,7 @@ export function createState(data, overlay = null) {
   state.content = baseContent(data);
   state.contentDirty = new Set();
   if (overlay && overlay.content) for (const [k, v] of Object.entries(overlay.content)) { state.content[k] = v; state.contentDirty.add(k); }
+  state.predictions = new Map(Object.entries((overlay && overlay.predictions) || {}).map(([k, v]) => [+k, v]));
   if (overlay) {
     for (const g of overlay.extraGames || []) { const x = toGame(g); state.games.push(x); state.byId.set(x.id, x); state.extraGames.push(g); }
     for (const id of overlay.order || []) {
@@ -45,6 +46,7 @@ export function createState(data, overlay = null) {
 export function toOverlay(state, extraGames = state.extraGames || []) {
   const o = { format: 1, season: state.data.id, games: {}, box: {}, order: state.recorded.slice(), meta: {}, extraGames };
   for (const id of state.recorded) { const g = state.byId.get(id); o.games[id] = [g.ptsA, g.ptsB]; o.box[id] = state.box.get(id); o.meta[id] = state.meta[id]; }
+  if (state.predictions && state.predictions.size) o.predictions = Object.fromEntries(state.predictions);
   if (state.contentDirty && state.contentDirty.size) { o.content = {}; for (const k of state.contentDirty) o.content[k] = state.content[k]; }
   return o;
 }

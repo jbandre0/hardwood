@@ -28,7 +28,7 @@ import { saveOverlay } from "../league/store.js";
     function render() {
       const wk = weeks(), cur = picksAll().filter((p) => p.week === week), prev = picksAll().filter((p) => p.week === week - 1);
       const pm = new Map(prev.map((p) => [p.team, p]));
-      const art = state.content.articles.find((a) => (a.type || "").toLowerCase().includes("bracket") && a.week === week);
+      const art = state.content.articles.find((a) => (!a.type || /bracket/i.test(a.type)) && a.week === week);
       const cell = (p) => { const t = teams[p.team]; const ch = changeLabel(p, pm.get(p.team)); return `<div class="bk-team">${p.seed ? `<span class="sd">${p.seed}</span>` : ""}${teamLink(t)}<span class="faint" style="font-size:.78rem">${p.bid === "Auto" ? "Auto" : ""}${p.ff ? " FF" : ""}</span><span class="${ch.startsWith("▲") ? "up" : ch.startsWith("▼") ? "down" : "faint"}" style="font-size:.78rem">${ch}</span></div>`; };
       const field = cur.filter((p) => p.group === "Field");
       const regionCard = (R) => `<div class="card"><div class="card-head"><h2>${R}</h2></div>${field.filter((p) => p.region === R).sort((a, b) => a.seed - b.seed).map(cell).join("")}</div>`;

@@ -1,5 +1,6 @@
 import { shell, fail } from "../ui.js";
-import { loadCore, esc, badge, teamLink, signed, scheduleFor, roundOf } from "../data.js";
+import { loadCore, loadAllSeasons, esc, badge, teamLink, signed, scheduleFor, roundOf } from "../data.js";
+import { teamHistory } from "../league/history.js";
 import { ENG } from "../league/stats.js";
 
 const IX = Object.fromEntries(ENG.map((n, i) => [n, i]));
@@ -61,6 +62,7 @@ const IX = Object.fromEntries(ENG.map((n, i) => [n, i]));
                   <td class="r num">${s.played ? `${s.us}-${s.them}` : `<span class="faint">upcoming</span>`}</td><td class="r num muted">${s.played ? `${rw}-${rl}` : ""}</td><td class="r num ${s.played ? (s.us > s.them ? "up" : "down") : ""}">${s.played ? signed(s.us - s.them, 0) : ""}</td></tr>`; }).join("")}
             </tbody></table></div>
           </div>
+          <div class="card plain" id="teamHist"><div class="card-head"><h2>Program history</h2></div><p class="muted">Loading every season…</p></div>
         </div>
         <div class="stack">
           <div class="card"><div class="card-head"><h2>Form</h2><span class="muted">Last 10: ${esc(t.last10 || "—")}</span></div><div class="form results">${form || '<span class="muted">No games yet</span>'}</div>
@@ -75,5 +77,13 @@ const IX = Object.fromEntries(ENG.map((n, i) => [n, i]));
             <p class="faint" style="margin:10px 0 0;font-size:.8rem">The engine plays this team with ${(w * 100).toFixed(0)}% of its own results and ${(100 - w * 100).toFixed(0)}% of its season-start line (fully its own after ${S.ramp} games). Starting tier rating ${t.tierRating.toFixed(1)}.</p></div>
         </div>
       </div>`;
+    loadAllSeasons().then((seasons) => {
+      const H = teamHistory(seasons, t.id), box = document.getElementById("teamHist");
+      const titles = H.filter((h) => h.champion).length, bids = H.filter((h) => h.seed != null).length;
+      box.innerHTML = `<div class="card-head"><h2>Program history</h2><span class="muted">${titles ? `${titles} title${titles > 1 ? "s" : ""} &middot; ` : ""}${bids} NCAA bid${bids === 1 ? "" : "s"} in ${H.length} season${H.length === 1 ? "" : "s"}</span></div>
+        <div class="table-wrap"><table><thead><tr><th>Season</th><th class="c">Tier</th><th class="r">Record</th><th class="r">Conf</th><th class="r">Rating</th><th class="r">Rank</th><th class="r">Final AP</th><th>Conf. tourney</th><th>NCAA</th></tr></thead><tbody>
+          ${H.map((h) => `<tr${h.status === "complete" ? "" : ' class="upcoming"'}><td><b>${esc(h.label)}</b>${h.status === "complete" ? "" : ' <span class="faint">(in progress)</span>'}</td><td class="c"><span class="pill">${h.tier}</span></td><td class="r num">${h.W}-${h.L}</td><td class="r num muted">${h.confW}-${h.confL}</td><td class="r num">${h.rank != null ? h.rating.toFixed(1) : "—"}</td><td class="r num">${h.rank ?? "—"}</td><td class="r num muted">${h.finalAP ?? ""}</td><td class="muted">${esc(h.confTourney || "")}</td><td>${h.champion ? '<span class="pill mint">Champion</span>' : h.seed != null ? `${h.seed}-seed &middot; ${esc(!h.ncaaResult ? "still alive" : h.ncaaResult === "Runner-up" ? "runner-up" : "lost in the " + h.ncaaResult)}` : '<span class="faint">no bid</span>'}</td></tr>`).join("")}
+        </tbody></table></div>`;
+    }).catch(() => { const box = document.getElementById("teamHist"); if (box) box.remove(); });
   } catch (err) { fail(view, err); }
 })();

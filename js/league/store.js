@@ -45,7 +45,7 @@ export async function listOverlays() {
 /** One file with every season's browser-saved changes. */
 export async function exportAll() {
   const overlays = await listOverlays();
-  try { localStorage.setItem("hw-last-export", String(Date.now())); const counts = {}; for (const [id, o] of Object.entries(overlays)) counts[id] = (o.order || []).length; localStorage.setItem("hw-last-export-counts", JSON.stringify(counts)); } catch { /* ignore */ }
+  try { localStorage.setItem("hw-last-export", String(Date.now())); const counts = {}; for (const [id, o] of Object.entries(overlays)) if (isSeasonKey(id)) counts[id] = (o.order || []).length; localStorage.setItem("hw-last-export-counts", JSON.stringify(counts)); } catch { /* ignore */ }
   return { format: 1, app: "hardwood-sim", exportedAt: new Date().toISOString(), overlays };
 }
 
@@ -63,3 +63,18 @@ export function unsavedSince(seasonId, overlay) {
     return Math.max(0, ((overlay && overlay.order) || []).length - (counts[seasonId] || 0));
   } catch { return ((overlay && overlay.order) || []).length; }
 }
+
+// ---------------------------------------------------------------- seasons created in this browser (offseason)
+// A new season's baseline lives under the key "base:<id>"; season status changes (e.g. Season 2 closed) under
+// "meta:seasons". Both travel inside exportAll()/importAll() like every other key.
+const BASE = "base:", META = "meta:seasons";
+export const isSeasonKey = (k) => !k.startsWith(BASE) && !k.startsWith("meta:");
+
+export async function saveLocalSeason(info, files) { return saveOverlay(BASE + info.id, { info, files }); }
+export async function loadLocalSeason(id) { return loadOverlay(BASE + id); }
+export async function deleteLocalSeason(id) { await clearOverlay(BASE + id); await clearOverlay(id); const m = await seasonMeta(); m.local = m.local.filter((x) => x !== id); delete m.status[id]; await saveOverlay(META, m); }
+export async function seasonMeta() {
+  const m = (await loadOverlay(META)) || {};
+  return { status: m.status || {}, local: m.local || [], current: m.current || null };
+}
+export async function updateSeasonMeta(fn) { const m = await seasonMeta(); fn(m); delete m.savedAt; await saveOverlay(META, m); return m; }

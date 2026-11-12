@@ -346,3 +346,19 @@ tr.upcoming td { color: var(--muted); }
 tr.upcoming a { color: var(--muted); }
 .bk-team { display: grid; grid-template-columns: 26px 1fr auto auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .bk-team .sd { font: 800 .9rem var(--display); color: var(--accent); }
+input[type="number"], textarea { background: var(--card-2); color: var(--text); border: 1px solid var(--line-2); border-radius: 6px; padding: 9px 11px; font: 500 .95rem var(--body); width: 100%; }
+textarea { min-height: 280px; line-height: 1.55; resize: vertical; }
+input[type="number"]:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tier-pick { display: inline-flex; gap: 2px; }
+.tier-pick button { width: 26px; height: 26px; border-radius: 4px; border: 1px solid var(--line-2); background: transparent; color: var(--muted); font: 700 .8rem var(--display); cursor: pointer; padding: 0; }
+.tier-pick button.sug { border-color: var(--accent); color: var(--accent); }
+.tier-pick button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.steps { counter-reset: step; display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.steps li { counter-increment: step; display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center; }
+.steps li::before { content: counter(step); display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--card-2); border: 1px solid var(--line-2); font: 700 .8rem var(--display); }
+.steps li.done::before { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); content: "✓"; }
+.award-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.award { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: var(--card-2); }
+.award small { display: block; color: var(--faint); font: 600 .75rem var(--body); text-transform: uppercase; letter-spacing: .04em; }
+.award b { display: block; font: 700 1.05rem var(--display); margin: 4px 0 2px; }
+.award span { color: var(--muted); font-size: .85rem; }

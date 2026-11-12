@@ -19,6 +19,7 @@ Reads cached cell values only (no macros). Writes `data/league.json`, `data/seas
 - `data/seasons/<id>/` is the baseline imported from the workbook (Season 1 complete, Season 2 through day 13).
 - Everything done on the site (games played, predictions, AP ballots, Power Poll snapshots, bracketology weeks, articles, the NCAA field, offseason choices) is saved in the browser (IndexedDB, localStorage fallback) as an overlay on top of the baseline.
 - Seasons created in the Offseason live in the browser too (key `base:<id>`), next to the season list (`meta:seasons`).
+- Every bracketology export carries a full backup; the bracketology session saves it to `data/backups/latest.json` (git history keeps every week), and the Commissioner desk can restore it on any browser.
 - **Commissioner desk, Download backup** writes all of it to one JSON file; **Restore from backup** puts it back. Back up after every session.
 
 ## The season loop
@@ -35,6 +36,7 @@ python3 -m http.server 8000 &                # then, in another shell:
 node tests/e2e/smoke.cjs                     # every page, both seasons, no console errors
 node tests/e2e/runner.cjs                    # play a day, reload, undo, backup, restore
 node tests/e2e/recap.cjs                     # finishing a day opens its recap
+node tests/e2e/backup.cjs                    # export with backup, save to repo, restore in a new browser
 node tests/e2e/gamedesk.cjs                  # Game desk: preview, play + log, load next with Enter
 node tests/e2e/season.cjs                    # play Season 2 to a champion
 node tests/e2e/lifecycle.cjs                 # ballot, column, full season, predictions, offseason, Season 3 (~6 min)

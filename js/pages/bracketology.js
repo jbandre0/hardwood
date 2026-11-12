@@ -5,14 +5,7 @@ import { computeBoard } from "../league/bracketology.js";
 import { suggestField, validateField, changeLabel, REGIONS } from "../league/field.js";
 import { setContent, toOverlay } from "../league/league.js";
 import { saveOverlay } from "../league/store.js";
-import { buildSeasonExport } from "../league/export.js";
-
-export function downloadExport(core) {
-  const x = buildSeasonExport(core.state, { id: core.season.id, label: core.season.label, status: core.season.status });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(x)], { type: "application/json" }));
-  a.download = `hardwood-${core.season.id}-through-day-${x.throughDay}.json`; a.click();
-}
+import { downloadSeasonExport } from "../export-download.js";
 
 (async function main() {
   const view = shell("bracketology");
@@ -58,7 +51,7 @@ export function downloadExport(core) {
         ${art ? `<div class="card"><div class="card-head"><h2>${esc(art.headline || art.heading || "This week")}</h2></div><div class="prose">${articleHTML(art.body)}</div></div>` : ""}`}`;
       if (wk.length) combobox(document.getElementById("cbWk"), { id: "wk", value: String(week), options: wk.map((w) => ({ value: String(w), label: w === 0 ? "Preseason" : "Week " + w })), onChange: (v) => { week = +v; render(); } });
       document.getElementById("edit").onclick = () => { editing = !editing; render(); };
-      document.getElementById("exportBk").onclick = () => downloadExport(core);
+      document.getElementById("exportBk").onclick = () => downloadSeasonExport(core);
       view.querySelectorAll("#modes button").forEach((b) => b.onclick = () => { mode = b.dataset.m; history.replaceState(null, "", mode === "list" ? "#list" : "#"); render(); });
       if (editing) wireEditor();
     }

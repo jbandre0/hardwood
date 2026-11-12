@@ -6,7 +6,7 @@ import { computeBoard } from "../league/bracketology.js";
 import { suggestField, validateField } from "../league/field.js";
 import { lockDay, lockPrediction, DEFAULT_SIMS } from "../league/predictions.js";
 import { dayDone } from "../league/recap.js";
-import { buildSeasonExport } from "../league/export.js";
+import { downloadSeasonExport } from "../export-download.js";
 import { saveOverlay, clearOverlay, exportAll, importAll, loadOverlay, unsavedSince, protectStorage } from "../league/store.js";
 
 const seed = () => crypto.getRandomValues(new Uint32Array(1))[0];
@@ -97,9 +97,10 @@ const fmt = (n) => n.toLocaleString();
             <p style="font-size:.9rem;margin:0 0 8px" id="storageState"></p>
             <p class="muted" style="font-size:.9rem">Games are saved in this browser only. A backup file holds everything for every season. Clearing site data or switching browsers would lose it, so download a backup after each session.</p>
             <div class="btn-row"><button class="btn" id="exportBtn" type="button">Download backup</button><label class="btn ghost" for="importFile" style="cursor:pointer">Restore from backup</label><input id="importFile" type="file" accept="application/json,.json" hidden></div>
+            <p class="muted" style="font-size:.88rem;margin:10px 0 0" id="repoBackup"></p>
             <p class="status" id="bstatus" aria-live="polite"></p>
             <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
-            <p class="muted" style="margin:0 0 10px;font-size:.9rem">Bracketology week: download the season so far and attach it when you ask Claude to "do bracketology".</p>
+            <p class="muted" style="margin:0 0 10px;font-size:.9rem">Bracketology week: download the season so far (with a full backup inside) and attach it when you ask Claude to "do bracketology". The session saves the backup to GitHub too.</p>
             <button class="btn ghost" id="exportBk" type="button">Export for bracketology</button>
           </div>
           ${complete ? "" : `<div class="card">
@@ -120,11 +121,18 @@ const fmt = (n) => n.toLocaleString();
     const busy = (on, msg) => { for (const id of ["playDay", "playOne", "undoOne", "undoDay"]) { const b = document.getElementById(id); if (b) b.disabled = on; } if (status) status.textContent = msg || ""; };
 
     protectStorage().then((st) => { const el = document.getElementById("storageState"); if (el) el.innerHTML = st === "protected" ? '<span class="up">Storage is protected</span> <span class="muted">(the browser won\'t clear it on its own)</span>' : st === "not-protected" ? '<span class="down">Storage is not protected</span> <span class="muted">(the browser may clear it if it runs low on space; bookmark the site and back up often)</span>' : '<span class="muted">This browser can\'t protect storage; back up often.</span>'; });
-    document.getElementById("exportBk")?.addEventListener("click", () => {
-      const x = buildSeasonExport(state, { id: season.id, label: season.label, status: season.status });
-      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(x)], { type: "application/json" }));
-      a.download = `hardwood-${season.id}-through-day-${x.throughDay}.json`; a.click();
-    });
+    // weekly backup saved to GitHub by the bracketology session (data/backups/latest.json)
+    fetch("data/backups/latest.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((B) => {
+      const el = document.getElementById("repoBackup"); if (!el || !B || B.none || !B.overlays) return;
+      const mine = state.recorded.length, theirs = (B.counts || {})[season.id] ?? 0;
+      el.innerHTML = `Weekly backup on GitHub: ${esc(B.from.label)} through day ${B.from.throughDay}, saved ${new Date(B.savedToRepoAt).toLocaleDateString()}. <button class="btn ghost" id="restoreRepo" type="button" style="padding:4px 10px;font-size:.82rem">Restore it</button>`;
+      document.getElementById("restoreRepo").onclick = async () => {
+        const warn = mine > theirs ? `\n\nCareful: this browser has ${mine} games recorded for ${season.label}, the GitHub backup only ${theirs}. Restoring loses the ${mine - theirs} newer games.` : "";
+        if (!confirm(`Replace what's saved in this browser with the GitHub backup (through day ${B.from.throughDay})?${warn}`)) return;
+        await importAll(B); resetCores(); await render(); const b = document.getElementById("bstatus"); if (b) b.textContent = "Restored the weekly GitHub backup.";
+      };
+    }).catch(() => {});
+    document.getElementById("exportBk")?.addEventListener("click", async () => { await downloadSeasonExport(core); await render(); const b = document.getElementById("bstatus"); if (b) b.textContent = "Export downloaded (it includes a full backup)."; });
     document.getElementById("predOn")?.addEventListener("change", (e) => { try { localStorage.setItem("hw-pred-on", e.target.checked ? "1" : "0"); } catch { /* ignore */ } });
     const simsBox = document.getElementById("cbSims");
     if (simsBox) combobox(simsBox, { id: "predSims", value: String(predSims()), searchable: false, options: [1000, 2000, 3000, 5000, 10000, 40000].map((n) => ({ value: String(n), label: n.toLocaleString() + (n === 40000 ? " (backtest standard, slow)" : "") })), onChange: (v) => { try { localStorage.setItem("hw-pred-sims", v); } catch { /* ignore */ } } });

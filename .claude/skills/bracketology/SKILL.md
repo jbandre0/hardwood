@@ -97,11 +97,16 @@ the commissioner asked to redo a week). Then check the page renders:
 node --test tests/editions.test.mjs
 python3 -m http.server 8000 &   # then: node tests/e2e/smoke.cjs
 ```
-Commit `data/editions.json` with a message like `Bracketology: Season 2 week 5` and push to `main` (the site deploys
-from `main` in about a minute). Retry pushes on network errors.
+Save the commissioner's backup (the export carries everything saved in their browser) so it survives off-browser:
+```bash
+node tools/save_backup.mjs <export.json>
+```
+Commit `data/editions.json` and `data/backups/latest.json` together with a message like `Bracketology: Season 2 week 5`
+and push to `main` (the site deploys from `main` in about a minute). Retry pushes on network errors. If the export has
+no backup inside (an old export), publish anyway and tell the commissioner the backup step was skipped.
 
 ## 5. Report back
 
-Reply with the headline, the four 1 seeds, who's in and out versus last week, the hottest take in one line, and where
+Reply with the headline, confirm the backup was saved (season, through day), the four 1 seeds, who's in and out versus last week, the hottest take in one line, and where
 to look: the Bracketology page (bracket and article) and the Articles page. Mention that a published edition replaces
 any field the commissioner made in the browser for that week.

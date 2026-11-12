@@ -22,7 +22,7 @@ jobs:
       - name: Stage only the site files (not research/, tools/ or the README)
         run: |
           mkdir _site
-          cp -r index.html matchup.html rankings.html standings.html team.html bracket.html about.html css js data assets fonts .nojekyll _site/
+          cp -r ./*.html css js data assets fonts .nojekyll _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

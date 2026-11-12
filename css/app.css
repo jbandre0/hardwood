@@ -362,3 +362,8 @@ input[type="number"]:focus, textarea:focus { outline: 2px solid var(--accent); o
 .award small { display: block; color: var(--faint); font: 600 .75rem var(--body); text-transform: uppercase; letter-spacing: .04em; }
 .award b { display: block; font: 700 1.05rem var(--display); margin: 4px 0 2px; }
 .award span { color: var(--muted); font-size: .85rem; }
+.gd-score { display: grid; gap: 8px; }
+.gd-team { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card-2); }
+.gd-team div { display: grid; } .gd-team div span { font-size: .82rem; }
+.gd-team .gd-pts { font: 800 2rem var(--display); color: var(--muted); }
+.gd-team.win .gd-pts { color: var(--text); } .gd-team.win { border-color: var(--accent); }

@@ -1,7 +1,7 @@
 import { shell, fail } from "../ui.js";
 import { combobox } from "../combobox.js";
 import { loadCore, resetCores, esc, badge, teamLink, signed } from "../data.js";
-import { rollAndRecord, playDay, undoLast, toOverlay, nextUnplayed, calc, setContent, syncTournament } from "../league/league.js";
+import { rollAndRecord, rollGame, recordRolled, playDay, undoLast, toOverlay, nextUnplayed, calc, setContent, syncTournament } from "../league/league.js";
 import { computeBoard } from "../league/bracketology.js";
 import { suggestField, validateField } from "../league/field.js";
 import { lockDay, lockPrediction, DEFAULT_SIMS } from "../league/predictions.js";
@@ -46,7 +46,7 @@ const fmt = (n) => n.toLocaleString();
         <div class="stack">
           <div class="card">
             <div class="kpis">
-              <div class="kpi"><small>Games played</small><b>${fmt(season.played)}</b><span>of ${fmt(season.total)}</span></div>
+              <div class="kpi"><small>Games played</small><b id="kPlayed">${fmt(season.played)}</b><span id="kTotal">of ${fmt(season.total)}</span></div>
               <div class="kpi"><small>Latest day</small><b>${season.day}</b><span>${season.day > 42 ? "of 54 (postseason)" : "of 42 regular-season days"}</span></div>
               <div class="kpi"><small>Next day</small><b>${nextDay ?? "—"}</b><span>${dayGames.length} games</span></div>
             </div>
@@ -62,6 +62,8 @@ const fmt = (n) => n.toLocaleString();
             </div>
             <p class="status" id="status" aria-live="polite"></p>`}
           </div>
+
+          ${!complete && nxt ? `<div class="card" id="gameDesk"></div>` : ""}
 
           ${last ? `<div class="card"><div class="card-head"><h2>${esc(last.title)}</h2><span class="muted">${last.rows.length} game${last.rows.length === 1 ? "" : "s"}</span></div>
             <div class="table-wrap"><table><tbody>${last.rows.map(resultRow).join("")}</tbody></table></div>
@@ -101,7 +103,7 @@ const fmt = (n) => n.toLocaleString();
           </div>`}
           <div class="card">
             <div class="card-head"><h2>How a game is played</h2></div>
-            <p class="muted" style="margin:0;font-size:.9rem">Each game is one roll of the v9 engine from each team's current inputs (a blend of its season-start line and its own results, fully its own after 10 games). The host opens with the ball, home court is worth about 3 points, and overtime plays on a continuous clock. After a day, every rating is re-solved from all results.</p>
+            <p class="muted" style="margin:0;font-size:.9rem">Each game is one roll of the v9 engine (a single game, never thousands) from each team's current inputs (a blend of its season-start line and its own results, fully its own after 10 games). The host opens with the ball, home court is worth about 3 points, and overtime plays on a continuous clock. After a day, every rating is re-solved from all results.</p>
           </div>
         </div>
       </div>
@@ -199,5 +201,79 @@ const fmt = (n) => n.toLocaleString();
         <table><thead><tr><th></th><th class="r">${esc(A.t.name)}</th><th class="r">${esc(B.t.name)}</th></tr></thead><tbody>${rows.map((r) => `<tr><td class="muted">${r[0]}</td><td class="r num">${r[1]}</td><td class="r num">${r[2]}</td></tr>`).join("")}</tbody></table>`;
       dlg.showModal();
     }));
+
+    if (document.getElementById("gameDesk")) gameDesk();
+
+    // ------------------------------------------------------------------------------------------------ Game desk
+    // The workbook's Game page + LoadNextGame / F9 / RecordAndLoadNext: the next scheduled game is loaded with its teams
+    // and site, rolled ONCE by the engine and shown. Re-roll as often as you like; "Log and load next" records exactly
+    // the game on screen and loads the next one. No typing team names.
+    function gameDesk() {
+      const box = document.getElementById("gameDesk");
+      let cur = null, logged = 0, busyNow = false, prev = null;
+      const pct = (m, a) => (a ? Math.round((m / a) * 100) + "%" : "—");
+      function load(id) {
+        const g = id != null ? state.byId.get(id) : nextUnplayed(state);
+        if (!g) { cur = null; return draw(); }
+        if (g.ptsA != null) { cur = { err: `Game ${id} is already recorded.` }; return draw(); }
+        let pred = state.predictions.get(g.id) || null;
+        if (!pred && predOn()) { try { pred = lockPrediction(state, g.id, { n: predSims() }); } catch { pred = null; } }
+        cur = { g, pred, rolls: 0 };
+        roll();
+      }
+      function roll() {
+        cur.r = rollGame(state, cur.g.id, seed());      // ONE game, one engine run
+        cur.rolls++;
+        draw();
+      }
+      function draw() {
+        if (!cur) { box.innerHTML = `<div class="card-head"><h2>Game</h2></div><p class="muted" style="margin:0">No game to load right now.</p>`; return; }
+        if (cur.err) { box.innerHTML = `<div class="card-head"><h2>Game</h2></div><p class="down">${esc(cur.err)}</p><div class="btn-row"><button class="btn" id="gdNext" type="button">Load next game</button></div>`; box.querySelector("#gdNext").onclick = () => load(); return; }
+        const { g, r, pred } = cur, A = teams[g.a], B = teams[g.b], aw = r.ptsA > r.ptsB;
+        const ctx = g.type === "NCAA" ? g.ctx : g.type === "CT" ? `${g.ctx} tournament` : g.type === "Conf" ? "Conference" : "Non-conference";
+        const line = (t, pts, bx, win) => `<div class="gd-team ${win ? "win" : ""}">${badge(t, 40)}<div><b>${esc(t.name)}</b><span class="muted">${t.w}-${t.l} &middot; #${t.rank}</span></div><span class="gd-pts">${pts}</span></div>`;
+        const st = (k1, k2, bx) => `${bx[k1]}-${bx[k2]}`;
+        box.innerHTML = `
+          <div class="card-head"><h2>Game ${g.id}</h2><span class="muted">Day ${g.day} &middot; ${esc(ctx)} &middot; ${g.home ? `at ${esc(B.name)}` : "neutral site"}</span></div>
+          <div class="gd-score">${line(A, r.ptsA, r.boxA, aw)}${line(B, r.ptsB, r.boxB, !aw)}</div>
+          <p class="muted" style="margin:10px 0 0;font-size:.88rem">${r.ot ? `<span class="pill">${r.ot > 1 ? r.ot : ""}OT</span> ` : ""}FG ${st("FGM", "FGA", r.boxA)} / ${st("FGM", "FGA", r.boxB)} &middot; 3P ${st("TPM", "TPA", r.boxA)} / ${st("TPM", "TPA", r.boxB)} &middot; FT ${st("FTM", "FTA", r.boxA)} / ${st("FTM", "FTA", r.boxB)} &middot; REB ${r.boxA.OR + r.boxA.DR} / ${r.boxB.OR + r.boxB.DR} &middot; TO ${r.boxA.TO} / ${r.boxB.TO}</p>
+          ${pred ? `<p class="faint" style="margin:6px 0 0;font-size:.82rem">Locked prediction (${pred.sims.toLocaleString()} sims, separate from this game): ${esc(A.name)} ${pct(pred.pA * 1000, 1000)}, margin ${pred.margin >= 0 ? "+" : ""}${pred.margin.toFixed(1)}. This game is a single roll${cur.rolls > 1 ? `, rolled ${cur.rolls} times` : ""}.</p>` : `<p class="faint" style="margin:6px 0 0;font-size:.82rem">This game is a single roll of the engine${cur.rolls > 1 ? ` (rolled ${cur.rolls} times)` : ""}.</p>`}
+          <div class="btn-row" style="margin-top:14px">
+            <button class="btn" id="gdLog" type="button" title="Enter">Log and load next</button>
+            <button class="btn ghost" id="gdRoll" type="button" title="R or F9">Re-roll</button>
+            <button class="btn ghost" id="gdLogOnly" type="button">Log this game only</button>
+            <span style="display:inline-flex;gap:6px;align-items:center"><input type="number" id="gdId" placeholder="Game #" style="width:110px" aria-label="Game number"><button class="btn ghost" id="gdLoad" type="button">Load</button></span>
+          </div>
+          <p class="status" id="gdStatus" aria-live="polite">${prev ? `Logged game ${prev.id}: <span id="gdPrev">${esc(teams[prev.a].name)} ${prev.ptsA}, ${esc(teams[prev.b].name)} ${prev.ptsB}</span>${prev.ot ? " (OT)" : ""} &middot; ${logged} this session.` : "Enter = log and load next, R = re-roll."}</p>`;
+        box.querySelector("#gdRoll").onclick = () => !busyNow && roll();
+        box.querySelector("#gdLog").onclick = () => log(true);
+        box.querySelector("#gdLogOnly").onclick = () => log(false);
+        box.querySelector("#gdLoad").onclick = () => { const v = parseInt(box.querySelector("#gdId").value, 10); if (v) load(v); };
+      }
+      async function log(next) {
+        if (busyNow || !cur || !cur.r) return;
+        busyNow = true;
+        try {
+          const { g, r } = cur, wasDay = g.day;
+          recordRolled(state, g.id, r);
+          await persist();
+          logged++; prev = { id: g.id, a: g.a, b: g.b, ptsA: r.ptsA, ptsB: r.ptsB, ot: r.ot };
+          last = { title: "Logged on the Game desk", rows: [{ id: g.id, a: g.a, b: g.b, ptsA: r.ptsA, ptsB: r.ptsB, ot: r.ot }, ...((last && last.title === "Logged on the Game desk") ? last.rows : [])].slice(0, 25) };
+          const kp = document.getElementById("kPlayed"); if (kp) kp.textContent = fmt(state.games.filter((x) => x.ptsA != null).length);
+          const kt = document.getElementById("kTotal"); if (kt) kt.textContent = `of ${fmt(state.games.length)}`;
+          const nx = nextUnplayed(state);
+          // a finished day, a new tournament round or the end of the season changes the rest of the page: redraw it all
+          if (!next || !nx || nx.day !== wasDay) { busyNow = false; await render(); return; }
+          load();
+        } catch (e) { const s = box.querySelector("#gdStatus"); if (s) s.textContent = "Could not log: " + e.message; }
+        busyNow = false;
+      }
+      document.onkeydown = (e) => {
+        if (!document.getElementById("gameDesk") || e.target.closest("input, textarea, [role=combobox]") || document.querySelector("dialog[open]")) return;
+        if (e.key === "Enter") { e.preventDefault(); log(true); }
+        else if (e.key === "r" || e.key === "R" || e.key === "F9") { e.preventDefault(); if (cur && cur.g && !busyNow) roll(); }
+      };
+      load();
+    }
   }
 })();

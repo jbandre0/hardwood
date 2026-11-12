@@ -22,7 +22,7 @@ Reads cached cell values only (no macros). Writes `data/league.json`, `data/seas
 - **Commissioner desk, Download backup** writes all of it to one JSON file; **Restore from backup** puts it back. Back up after every session.
 
 ## The season loop
-1. Commissioner desk: play days (predictions are locked first unless switched off). Conference tournaments (days 43-47) are generated when the regular season ends; seeding is conference win %, then head-to-head among tied teams, then margin, then overall record (inferred from Season 1's real seedings).
+1. Commissioner desk: the Game card loads the next scheduled game, already rolled once (Re-roll / R as often as you like, like F9 in the workbook), then Log and load next (Enter) records exactly that game and loads the next one. Play day does a whole day at once. Every game is a single engine roll; the thousands of simulations are only for the prediction locked before it (switch off on the desk). Conference tournaments (days 43-47) are generated when the regular season ends; seeding is conference win %, then head-to-head among tied teams, then margin, then overall record (inferred from Season 1's real seedings).
 2. Rankings: cast the weekly AP ballot (a Power Poll snapshot is saved with it). Bracketology: suggest and save the weekly field. Articles: draft the weekly column from the numbers, edit, publish.
 3. After day 47: Build NCAA field (conference champions get the auto-bids; the rest from the Bracketology Board), then play days 48-54.
 4. Offseason: awards, tier review with overrides, settings, marquee games, then create the next season (a backup downloads first).
@@ -33,6 +33,7 @@ node --test tests/*.test.mjs                 # unit tests, verified against the 
 python3 -m http.server 8000 &                # then, in another shell:
 node tests/e2e/smoke.cjs                     # every page, both seasons, no console errors
 node tests/e2e/runner.cjs                    # play a day, reload, undo, backup, restore
+node tests/e2e/gamedesk.cjs                  # Game desk: load next, re-roll, log with Enter
 node tests/e2e/season.cjs                    # play Season 2 to a champion
 node tests/e2e/lifecycle.cjs                 # ballot, column, full season, predictions, offseason, Season 3 (~6 min)
 ```

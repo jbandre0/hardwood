@@ -95,6 +95,17 @@ export function record(state, gameId, result, meta = {}) {
   return g;
 }
 
+/**
+ * The macro's RecordCurrentGame: record exactly the game already rolled and shown on screen (no new roll),
+ * then re-solve the ratings and generate any tournament games that just became known.
+ */
+export function recordRolled(state, gameId, result, meta = {}) {
+  record(state, gameId, result, { seed: result.seed, ...meta });
+  calc(state);
+  syncTournament(state);
+  return state.byId.get(gameId);
+}
+
 /** Roll and record one game (ratings recalculated afterwards, like the macro's RecordCurrentGame). */
 export function rollAndRecord(state, gameId, seed) {
   const r = rollGame(state, gameId, seed);

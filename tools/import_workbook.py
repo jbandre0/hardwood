@@ -270,6 +270,21 @@ def main(path, season_label):
     maxday = max(g[1] for g in games if g[7] is not None)
     cs = slug(closed)
     dump(os.path.join(DATA, "seasons", cs, "archive.json"), arch)
+    # the closed season's final engine lines come from the archive's full-precision 'Eng' columns (BL and HFA*Ra are not recorded, so keep the tier values)
+    ct = os.path.join(DATA, "seasons", cs, "teams.json")
+    if os.path.exists(ct):
+        cteams = json.load(open(ct)); byid = {r["Team id"]: r for r in arch["seasonStats"] if "Team id" in r}
+        eng_names = {"PPG": "Eng PPG", "REB": "Eng REB", "ST": "Eng ST", "TO": "Eng TO", "FT%": "Eng FT%", "3P%": "Eng 3P%", "OR": "Eng OR", "DR": "Eng DR",
+                     "FTA": "Eng FTA", "FGA": "Eng FGA", "2P%": "Eng 2P%", "OEFG%": "Eng OEFG%", "STR*Ra": "Eng STR*Ra", "POSS": "Eng POSS",
+                     "Opp OR/G (TR)": "Eng Opp OR/G (TR)", "Opp eFG% (TR)": "Eng Opp eFG% (TR)", "Opp 2P% (TR)": "Eng Opp 2P% (TR)", "Opp 3P% (TR)": "Eng Opp 3P% (TR)",
+                     "Opp TO% (TR)": "Eng Opp TO% (TR)", "Opp FTA/FGA (TR)": "Eng Opp FTA/FGA (TR)", "FTA/FGA (TR)": "Eng FTA/FGA (TR)"}
+        for t in cteams:
+            row = byid[t["id"]]
+            fin = list(t["final"])
+            for name, col in eng_names.items():
+                fin[ENG_COLS.index(name)] = r_(row[col], 6)
+            t["final"] = fin
+        dump(ct, cteams)
     index_path = os.path.join(DATA, "seasons", "index.json")
     index = json.load(open(index_path)) if os.path.exists(index_path) else []
     keep = {x["id"]: x for x in index}

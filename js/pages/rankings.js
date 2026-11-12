@@ -11,7 +11,7 @@ import { loadCore, esc, teamLink, signed, recordAsOf } from "../data.js";
     let week = core.polls.length - 1;
 
     view.innerHTML = `
-      <div class="page-title"><span class="kicker">Season 1 final</span><h1>Rankings</h1>
+      <div class="page-title"><span class="kicker">${esc(core.season.label)} ${core.season.status === "complete" ? "final" : "&middot; through day " + core.season.day}</span><h1>Rankings</h1>
         <p>Power ratings come from the sim itself: average margin plus the strength of everyone you played, solved for all 365 teams at once. The AP Top 25 is the committee's weekly poll.</p></div>
       <div class="seg" style="margin-bottom:16px" id="tabs"><button type="button" data-t="power">Power ratings</button><button type="button" data-t="ap">AP Top 25</button></div>
       <div class="card plain" id="panel"></div>`;
@@ -20,9 +20,9 @@ import { loadCore, esc, teamLink, signed, recordAsOf } from "../data.js";
 
     const COLS = [
       ["rank", "#", (t) => t.rank, "c"], ["name", "Team", null], ["conf", "Conf", null], ["tier", "Tier", null],
-      ["w", "Record", null, "r"], ["margin", "Margin/G", null, "r"], ["oppRating", "SOS", null, "r"], ["rating", "Rating", null, "r"],
+      ["w", "Record", null, "r"], ["margin", "Margin/G", null, "r"], ["oppRating", "SOS", null, "r"], ["vsTier", "vs tier", null, "r"], ["rating", "Rating", null, "r"],
     ];
-    const val = (t, k) => (k === "name" ? t.name : k === "conf" ? t.conf : k === "tier" ? t.tier : k === "w" ? t.w / (t.w + t.l) : t[k]);
+    const val = (t, k) => (k === "name" ? t.name : k === "conf" ? t.conf : k === "tier" ? t.tier : k === "w" ? t.w / Math.max(1, t.w + t.l) : k === "vsTier" ? t.rating - t.tierRating : t[k]);
 
     function power() {
       let rows = core.teams.filter((t) => (!st.conf || t.conf === st.conf) && (!st.tier || t.tier === st.tier));
@@ -38,7 +38,7 @@ import { loadCore, esc, teamLink, signed, recordAsOf } from "../data.js";
           <div class="field" style="align-self:end"><span class="muted">${rows.length} teams</span></div>
         </div>
         <div class="table-wrap"><table><thead><tr>${COLS.map(([k, label, , al]) => `<th class="sortable ${al || ""} ${st.sort === k ? "sorted" : ""}" data-k="${k}" aria-sort="${st.sort === k ? (st.dir > 0 ? "ascending" : "descending") : "none"}">${label}${st.sort === k ? (st.dir > 0 ? " ▲" : " ▼") : ""}</th>`).join("")}</tr></thead><tbody>
-          ${rows.map((t) => `<tr><td class="rank c">${t.rank}</td><td>${teamLink(t)}</td><td class="muted">${esc(t.conf)}</td><td><span class="pill">${esc(t.tier)}</span></td><td class="r num">${t.w}-${t.l}</td><td class="r num ${t.margin >= 0 ? "up" : "down"}">${signed(t.margin)}</td><td class="r num muted">${t.oppRating.toFixed(1)}</td>
+          ${rows.map((t) => `<tr><td class="rank c">${t.rank}</td><td>${teamLink(t)}</td><td class="muted">${esc(t.conf)}</td><td><span class="pill">${esc(t.tier)}</span></td><td class="r num">${t.w}-${t.l}</td><td class="r num ${t.margin >= 0 ? "up" : "down"}">${signed(t.margin)}</td><td class="r num muted">${t.oppRating.toFixed(1)}</td><td class="r num ${t.rating - t.tierRating >= 0 ? "up" : "down"}">${signed(t.rating - t.tierRating)}</td>
             <td class="r"><div class="bar-cell" style="justify-content:flex-end"><i style="width:${Math.max(4, ((t.rating - mn) / (mx - mn)) * 70)}px"></i><span><b>${t.rating.toFixed(1)}</b></span></div></td></tr>`).join("")}
         </tbody></table></div>`;
       combobox(panel.querySelector("#cbConf"), { id: "fc", value: st.conf, placeholder: "Conference", onChange: (v) => { st.conf = v; power(); },
@@ -65,7 +65,7 @@ import { loadCore, esc, teamLink, signed, recordAsOf } from "../data.js";
             return `<tr><td class="rank c">${r}</td><td>${teamLink(t)}</td><td class="muted">${esc(t.conf)}</td><td class="r num">${recordAsOf(core, id, p.afterDay)}</td><td class="c">${mv}</td><td class="r num"><b>${t.rating.toFixed(1)}</b></td></tr>`;
           }).join("")}
         </tbody></table></div>
-        <p class="faint" style="margin:12px 0 0;font-size:.82rem">Rating shown is each team's final Season 1 rating. The poll itself doesn't feed the simulation.</p>`;
+        <p class="faint" style="margin:12px 0 0;font-size:.82rem">Rating shown is each team's current rating. The poll itself doesn't feed the simulation.</p>`;
       panel.querySelectorAll(".poll-tabs button").forEach((b) => b.onclick = () => { week = +b.dataset.i; ap(); });
     }
 

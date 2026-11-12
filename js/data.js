@@ -1,40 +1,78 @@
 // Data loading + derived structures shared by every page.
 
+import { loadSeasonData, createState, calc, lastPlayedDay, playedCount } from "./league/league.js";
+import { loadOverlay } from "./league/store.js";
+
 const cache = new Map();
-export function getJSON(name) {
-  if (!cache.has(name)) cache.set(name, fetch(`data/${name}.json`).then((r) => {
-    if (!r.ok) throw new Error(`Could not load data/${name}.json (${r.status})`);
+export function fetchJSON(path) {
+  if (!cache.has(path)) cache.set(path, fetch(path).then((r) => {
+    if (!r.ok) throw new Error(`Could not load ${path} (${r.status})`);
     return r.json();
   }));
-  return cache.get(name);
+  return cache.get(path);
 }
+export const getJSON = (name) => fetchJSON(`data/${name}.json`);
 
 export const ROUND_BY_DAY = { 48: "First Four", 49: "First Round", 50: "Second Round", 51: "Sweet 16", 52: "Elite Eight", 53: "Final Four", 54: "Championship" };
 export const REGIONS = ["East", "West", "South", "Midwest"];
 
-let corePromise;
-let LOGOS = {}; // team slug -> logo file in assets/logos/ (set by loadCore)
-export function loadCore() {
-  if (!corePromise) corePromise = (async () => {
-    const [teams, g, meta, ncaa, polls, logos] = await Promise.all([
-      getJSON("teams"), getJSON("games"), getJSON("meta"), getJSON("ncaa"), getJSON("polls"),
-      getJSON("logos").catch(() => ({})), // logos are optional: a missing map just means monogram badges
-    ]);
-    LOGOS = logos;
-    const bySlug = new Map(teams.map((t) => [t.slug, t]));
-    const games = g.rows.map((r) => {
-      const [id, day, type, ctx, a, b, home, ptsA, ptsB] = r;
-      const w = ptsA > ptsB ? a : b;
-      return { id, day, type, ctx, a, b, home, ptsA, ptsB, w, l: w === a ? b : a, margin: Math.abs(ptsA - ptsB) };
-    });
-    const teamGames = teams.map(() => []);
-    for (const gm of games) { teamGames[gm.a].push(gm); teamGames[gm.b].push(gm); }
-    const seed = new Map(); // teamId -> {seed, region}
-    for (const f of ncaa.field) seed.set(f.team, { seed: f.seed, region: f.region, ff: f.ff });
-    const confs = [...new Set(teams.map((t) => t.conf))].sort((x, y) => x.localeCompare(y));
-    return { teams, bySlug, games, teamGames, meta, ncaa, polls, seed, confs };
-  })();
-  return corePromise;
+// ---------- which season are we looking at? ----------
+export async function seasonsIndex() { return getJSON("seasons/index"); }
+export async function activeSeasonId() {
+  const idx = await seasonsIndex();
+  const ids = idx.map((s) => s.id);
+  const q = new URLSearchParams(location.search).get("s");
+  if (q && ids.includes(q)) { try { localStorage.setItem("hw-season", q); } catch { /* ignore */ } return q; }
+  try { const saved = localStorage.getItem("hw-season"); if (saved && ids.includes(saved)) return saved; } catch { /* ignore */ }
+  const live = idx.find((s) => s.status === "in-progress");
+  return (live || idx[idx.length - 1]).id;
+}
+export function setActiveSeason(id) { try { localStorage.setItem("hw-season", id); } catch { /* ignore */ } }
+
+let LOGOS = {}; // team slug -> {f, t?} (set when a season loads)
+const cores = new Map();
+export function loadCore(seasonId) {
+  const key = seasonId || "__active";
+  if (!cores.has(key)) cores.set(key, buildCore(seasonId));
+  return cores.get(key);
+}
+/** Drop cached cores (after the runner changes games) so pages rebuild from the saved state. */
+export function resetCores() { cores.clear(); }
+
+async function buildCore(seasonId) {
+  const id = seasonId || (await activeSeasonId());
+  const idx = await seasonsIndex();
+  const info = idx.find((s) => s.id === id);
+  const [data, overlay, logos] = await Promise.all([loadSeasonData(id, fetchJSON, info && info.files), loadOverlay(id).catch(() => null), getJSON("logos").catch(() => ({}))]);
+  LOGOS = logos;
+  const state = createState(data, overlay);
+  const c = calc(state);
+  const L = data.league;
+  const nm = (i) => (i === null || i === undefined ? "—" : `#${c.teams[i].stats.rank ?? "?"} ${L[i].name}`);
+  const teams = L.map((t) => {
+    const r = c.teams[t.id], s = r.stats, tm = data.teams[t.id];
+    return {
+      id: t.id, slug: t.slug, name: t.name, conf: tm.conf, tier: tm.tier,
+      gp: s.GP, w: s.W, l: s.L, cw: s.confW, cl: s.confL, home: s.home, away: s.away, neutral: s.neutral,
+      pf: s.pfpg, pa: s.papg, margin: s.margin, oppRating: s.sos, sos: s.sos, rating: s.rating, tierRating: s.tierRating, eff: s.eff,
+      rank: s.rank ?? 999, last10: s.last10 ?? "", streak: s.streak ?? "", bestWin: nm(s.bestWin), worstLoss: nm(s.worstLoss),
+      eng: [t.name, tm.conf, ...r.live], start: tm.start, final: tm.final || null,
+    };
+  });
+  const bySlug = new Map(teams.map((t) => [t.slug, t]));
+  const games = state.games.map((g) => {
+    const played = g.ptsA != null, w = played ? (g.ptsA > g.ptsB ? g.a : g.b) : null;
+    return { ...g, played, w, l: played ? (w === g.a ? g.b : g.a) : null, margin: played ? Math.abs(g.ptsA - g.ptsB) : null };
+  });
+  const teamGames = teams.map(() => []);
+  for (const g of games) if (g.a != null) { teamGames[g.a].push(g); teamGames[g.b].push(g); }
+  const ncaa = data.ncaa || { field: [] };
+  const seed = new Map(); for (const f of ncaa.field) seed.set(f.team, { seed: f.seed, region: f.region, ff: f.ff });
+  const confs = [...new Set(teams.map((t) => t.conf))].sort((x, y) => x.localeCompare(y));
+  const season = { id, label: info ? info.label : id, status: info ? info.status : "complete", day: lastPlayedDay(state), played: playedCount(state), total: state.games.length, regularSeasonDays: 42 };
+  const meta = { ...(data.meta || {}), version: (data.meta && data.meta.version) || "v9" };
+  const polls = (data.polls && data.polls.ap) || [];
+  return { season, teams, bySlug, games, teamGames, meta, ncaa, polls, seed, confs, state, calc: c, data, overlay, league: L };
 }
 
 // ---------- formatting ----------
@@ -71,7 +109,7 @@ export function roundOf(g) {
 // record as of a given day (inclusive), across all game types
 export function recordAsOf(core, teamId, day) {
   let w = 0, l = 0;
-  for (const g of core.teamGames[teamId]) if (g.day <= day) (g.w === teamId ? w++ : l++);
+  for (const g of core.teamGames[teamId]) if (g.played && g.day <= day) (g.w === teamId ? w++ : l++);
   return `${w}-${l}`;
 }
 
@@ -81,7 +119,7 @@ export function scheduleFor(core, teamId) {
     const isA = g.a === teamId;
     const opp = isA ? g.b : g.a;
     const venue = g.home === 0 ? "N" : (isA ? "@" : "vs");
-    return { g, opp, venue, us: isA ? g.ptsA : g.ptsB, them: isA ? g.ptsB : g.ptsA, won: g.w === teamId };
+    return { g, opp, venue, us: isA ? g.ptsA : g.ptsB, them: isA ? g.ptsB : g.ptsA, won: g.played ? g.w === teamId : null, played: g.played };
   }).sort((x, y) => x.g.day - y.g.day || x.g.id - y.g.id);
 }
 

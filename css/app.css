@@ -329,3 +329,18 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
 /* brand logo (the supplied H/W + ball mark). Cream letters need a dark backing on the cream theme. */
 .brand-logo { height: 40px; width: auto; display: block; flex: none; }
 :root[data-theme="light"] .brand-logo { background: #164434; border-radius: 6px; padding: 3px 4px; height: 46px; box-sizing: border-box; }
+
+/* season switcher in the top bar */
+.season-pick { margin-left: auto; width: 190px; }
+.season-pick .cb-input { padding-top: 9px; padding-bottom: 9px; font-size: .92rem; }
+@media (max-width: 860px) { .season-pick { width: 150px; } }
+
+/* commissioner desk */
+tr.clickable { cursor: pointer; }
+dialog { background: var(--card-2); color: var(--text); border: 1px solid var(--line-2); border-radius: 8px; padding: 22px; width: min(520px, 92vw); }
+dialog::backdrop { background: rgba(0, 0, 0, .55); }
+.status { color: var(--muted); font-size: .9rem; min-height: 1.4em; margin: 10px 0 0; }
+.btn.ghost:disabled { opacity: .4; cursor: not-allowed; }
+
+tr.upcoming td { color: var(--muted); }
+tr.upcoming a { color: var(--muted); }

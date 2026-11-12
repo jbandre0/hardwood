@@ -1,5 +1,6 @@
 // App shell: rail nav, top bar with team search, theme toggle.
-import { loadCore, esc, teamHref } from "./data.js";
+import { loadCore, esc, teamHref, seasonsIndex, activeSeasonId, setActiveSeason } from "./data.js";
+import { combobox } from "./combobox.js";
 
 const I = {
   home: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/>',
@@ -10,6 +11,7 @@ const I = {
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  play: '<path d="M6 4l14 8-14 8z"/>',
   theme: '<path d="M21 12.8A8.5 8.5 0 1 1 11.2 3 6.5 6.5 0 0 0 21 12.8Z"/>',
 };
 const svg = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true">${I[k]}</svg>`;
@@ -20,6 +22,7 @@ const NAV = [
   ["rankings", "Rankings", "rankings.html", "rank"],
   ["standings", "Standings", "standings.html", "stand"],
   ["bracket", "March Madness", "bracket.html", "bracket"],
+  ["play", "Commissioner", "play.html", "play"],
   ["about", "How it works", "about.html", "info"],
 ];
 
@@ -42,7 +45,7 @@ export function shell(page) {
           <span class="brand-name">Hardwood<small>Sim</small></span>
         </a>
         <nav class="nav">${nav}</nav>
-        <div class="rail-foot">Engine v9 &middot; 40,000 sims per matchup<br>Season 1 complete</div>
+        <div class="rail-foot">Engine v9 &middot; 40,000 sims per matchup</div>
       </aside>
       <div class="main">
         <header class="topbar">
@@ -52,7 +55,7 @@ export function shell(page) {
             <input id="q" type="search" placeholder="Search 365 teams" autocomplete="off" aria-label="Search teams">
             <div class="suggest" id="suggest" role="listbox"></div>
           </div>
-          <span class="season-chip">Season 1 &middot; 2026-27</span>
+          <div class="season-pick" id="seasonPick" aria-label="Season"></div>
           <button class="icon-btn" id="theme" aria-label="Toggle light or dark theme">${svg("theme")}</button>
         </header>
         <main id="view"><div class="skeleton" style="min-height:320px"></div></main>
@@ -68,6 +71,7 @@ export function shell(page) {
     try { localStorage.setItem("hw-theme", next); } catch { /* ignore */ }
   };
   wireSearch();
+  wireSeasons();
   return document.getElementById("view");
 }
 
@@ -97,4 +101,17 @@ async function wireSearch() {
 export function fail(view, err) {
   console.error(err);
   view.innerHTML = `<div class="card empty"><h3>Couldn't load the data</h3><p>${esc(err.message)}</p><p class="faint">If you opened this file directly, serve the folder instead: <code>python3 -m http.server</code></p></div>`;
+}
+
+async function wireSeasons() {
+  const box = document.getElementById("seasonPick");
+  if (!box) return;
+  try {
+    const [idx, cur] = await Promise.all([seasonsIndex(), activeSeasonId()]);
+    combobox(box, {
+      id: "seasonSel", value: cur, searchable: false, placeholder: "Season",
+      options: idx.map((x) => ({ value: x.id, label: x.label + (x.status === "in-progress" ? " (live)" : ""), html: `<span>${esc(x.label)}</span><span class="sub">${x.status === "in-progress" ? "in progress" : "complete"}</span>` })),
+      onChange: (v) => { setActiveSeason(v); const u = new URL(location.href); u.searchParams.delete("s"); location.href = u.pathname.endsWith("team.html") ? "index.html" : u.toString(); },
+    });
+  } catch { box.remove(); }
 }

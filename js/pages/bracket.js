@@ -11,6 +11,11 @@ const LABELS = ["First Round", "Second Round", "Sweet 16", "Elite Eight"];
     const core = await loadCore();
     const { teams, games, seed } = core;
     const ncaa = games.filter((g) => g.type === "NCAA");
+    if (!ncaa.length) {
+      view.innerHTML = `<div class="page-title"><span class="kicker">${esc(core.season.label)}</span><h1>March Madness</h1>
+        <p>The tournament field for ${esc(core.season.label)} isn't set yet. Conference tournaments run on days 43-47 and the NCAA Tournament on days 48-54, after the regular season (day 42). Season 1's bracket is under the season switcher at the top.</p></div>`;
+      return;
+    }
     const seedOf = (id) => seed.get(id)?.seed ?? "";
 
     const team = (id, pts, win, upset) => {
@@ -61,10 +66,11 @@ const LABELS = ["First Round", "Second Round", "Sweet 16", "Elite Eight"];
     const first4 = ncaa.filter((g) => g.day === 48);
 
     // narrative review
-    const review = articleHTML(core.meta.article.body);
+    const art = core.meta.article || { body: "", headline: "" };
+    const review = articleHTML(art.body);
 
     view.innerHTML = `
-      <div class="page-title"><span class="kicker">Season 1 &middot; Days 48&ndash;54</span><h1>March Madness</h1>
+      <div class="page-title"><span class="kicker">${esc(core.season.label)} &middot; Days 48&ndash;54</span><h1>March Madness</h1>
         <p>Sixty-eight teams, seven days, one net. Peach seed numbers mark upsets. Scroll sideways on a phone.</p></div>
       <div class="card" style="margin-bottom:18px;padding:22px 18px">
         <div class="bracket-scroll"><div class="bracket">
@@ -83,8 +89,8 @@ const LABELS = ["First Round", "Second Round", "Sweet 16", "Elite Eight"];
         <div class="grid cols-2" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${first4.map(gameBox).join("")}</div>
       </div>
       <div class="card" id="review">
-        <div class="card-head"><h2>${esc((core.meta.article.headline || "Tournament in review").split(":")[0])}</h2><span class="pill mint">Bracketology HQ</span></div>
-        <p class="muted" style="margin-top:-6px">${esc(core.meta.article.headline || "")}</p>
+        <div class="card-head"><h2>${esc((art.headline || "Tournament in review").split(":")[0])}</h2><span class="pill mint">Bracketology HQ</span></div>
+        <p class="muted" style="margin-top:-6px">${esc(art.headline || "")}</p>
         <div class="prose">${review}</div>
       </div>`;
     if (location.hash === "#review") document.getElementById("review").scrollIntoView();

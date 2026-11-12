@@ -262,6 +262,8 @@ def main(path, season_label):
     dump(os.path.join(sd, "box.json"), dict(cols=["id"] + BOX_COLS, rows=box))
     dump(os.path.join(sd, "settings.json"), dict(settings=settings, tiers=tiers, statRanges=stat_ranges, conversion=conv, engCols=ENG_COLS,
                                                   tierCounts=dict(tier_counts)))
+    dump(os.path.join(DATA, "seasons", slug(offseason_settings["closedSeason"]), "settings.json"),   # the closed season used the same Tier Setup constants
+         dict(settings=settings, tiers=tiers, statRanges=stat_ranges, conversion=conv, engCols=ENG_COLS, tierCounts=dict(collections.Counter(t["oldTier"] for t in tier_review)), inheritedFrom=sid))
     dump(os.path.join(sd, "marquee.json"), marquee)
     dump(os.path.join(sd, "polls.json"), dict(ap=ballots, power=power))
     dump(os.path.join(sd, "bracketology.json"), dict(settings=board_settings, picks=picks, articles=articles, commAdj=comm_adj))
@@ -308,11 +310,27 @@ def main(path, season_label):
         newTierStats=tstats,
         tierRatingsCentered=[r_(cell(rr, 14), 9) for rr in range(19, 25)],
     )
+    # Standings sheet: the selected conference's order, and the conference power table underneath it
+    st_rows = w.rows("Standings")
+    conf_sel = next(r[2] for r in st_rows if r and r[1] == "Conference" and r[2])
+    hi = next(i for i, r in enumerate(st_rows) if r and r[1] == "Rank")
+    order = []
+    for r in st_rows[hi + 1:]:
+        if r[1] is None or not isinstance(r[1], (int, float)): break
+        order.append(r[2])
+    pi = next(i for i, r in enumerate(st_rows) if r and r[1] == "Conference" and r[2] == "Teams")
+    power = []
+    for r in st_rows[pi + 1:]:
+        if not r[1] or not isinstance(r[2], (int, float)) or r[7] is None: break
+        power.append(dict(conf=r[1], teams=r[2], ncW=r[3], ncL=r[4], ncPct=r_(r[5], 9), avgRating=r_(r[6], 9), avgTier=r_(r[7], 9), rank=r[8]))
+    fx["standings"] = dict(conf=conf_sel, order=order, power=power)
     dump(os.path.join(FIX, "season2-workbook-expected.json"), fx)
     # calibration log (1,000 frozen avg-vs-avg games) for box-score distribution tests
     _, cal = w.table("Calibration Log", "Engine POSS")
     cal = [[r["Game"], r["Slot"], r["PTS"], r["FGA"], r["FGM"], r["3PA"], r["3PM"], r["2PA"], r["2PM"], r["FTA"], r["FTM"], r["TO"], r["ST"], r["OR"], r["DR"], r["OT"]] for r in cal if r.get("Slot")]
     dump(os.path.join(FIX, "calibration-log.json"), dict(cols=["Game", "Slot", "PTS", "FGA", "FGM", "3PA", "3PM", "2PA", "2PM", "FTA", "FTM", "TO", "ST", "OR", "DR", "OT"], rows=cal))
+    import subprocess
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "build_index.py")], check=True, stdout=subprocess.DEVNULL)   # keep the season file manifest current
     print(f"\nSeason '{season_label}' ({sid}): {played} of {len(games)} regular-season games played, through day {maxday}; "
           f"{len(ballots)} AP ballots, {len(picks)} bracketology picks, {len(articles)} articles, {len(marquee)} marquee games.")
     print(f"Archive for closed season '{closed}': " + ", ".join(f"{k}={len(v)}" for k, v in arch.items()))

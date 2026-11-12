@@ -100,7 +100,7 @@ function side(o, d) {
 }
 
 // one possession -> outcome code (1..29); sets lastFM = "first free throw made" flag
-let lastFM = false;
+let lastFM = false, lastOO = false; // lastFM: first free throw made; lastOO: foul was a one-and-one (AF >= 72)
 function possession(s, rand) {
   const Y = rand();
   const Z = rand() * 10000, AA = rand() * 7, AC = rand() * 10000, AD = rand() * 1000;
@@ -108,6 +108,7 @@ function possession(s, rand) {
   const AH = rand() * 100, AI = rand() * 100, AJ = rand() * 100, AK = rand() * 100;
   const { I, H, J } = s;
   lastFM = AG < J;
+  lastOO = AF >= 72;
   if (Y > s.AH_) {
     // normal branch
     if (Z < s.toThr) return AA < 4 ? 4 : 5;
@@ -241,4 +242,62 @@ export function playGame(rowA, rowB, venue = "neutral", { seed = (Math.random() 
   const [fa, fb, ot, otLog] = playOvertime(m, rand, pa, pb, true);
   if (ot) log = log.concat(otLog);
   return { scoreA: fa, scoreB: fb, ot, first, log, seed };
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// A recorded league game, played exactly as the workbook's Engine sheet plays it (v9):
+//  - Team B (the host / second-listed team) always has the opening possession.
+//  - One continuous clock from 2400 s. A possession that starts with any time left is played in full. The game ends at
+//    the first possession whose end passes a period boundary (regulation end, then every 300 s of overtime) with the
+//    score not tied. (The predictor above uses the Python copy's rule instead; see Method Write-up.)
+//  - Box score by the Engine sheet's counting rules (see boxFromCodes).
+// Returns { ptsA, ptsB, ot, boxA, boxB, log } with box = {FGM,FGA,TPM,TPA,FTM,FTA,OR,DR,TO,ST,POSS}.
+const OT_SECONDS = 300;
+const FG_ATT = new Int8Array(30), FG_MADE = new Int8Array(30), TP_ATT = new Int8Array(30), TP_MADE = new Int8Array(30);
+{
+  for (const c of [7, 8, 9, 10, 19, 20, 21, 22, 23, 25, 26, 27, 28]) FG_ATT[c] = 1;
+  for (let c = 11; c <= 18; c++) FG_ATT[c] = 2;
+  for (const c of [7, 9, 11, 12, 15, 16, 19, 20, 22, 25, 27]) FG_MADE[c] = 1;
+  const t3 = { 7: 1, 8: 1, 11: 2, 12: 1, 13: 2, 14: 1, 15: 1, 17: 1, 22: 1, 23: 1, 25: 1, 26: 1 };
+  for (const c in t3) TP_ATT[c] = t3[c];
+  for (const c of [7, 11, 12, 22, 25]) TP_MADE[c] = 1;
+}
+const DR_CODES = [1, 3, 8, 10, 13, 14, 17, 18, 21, 23, 24, 26, 28]; // opponent possessions that end with a defensive rebound
+
+function boxFromCodes(own, opp, ftAdj) {
+  // own / opp: counts of outcome codes (index 1..29) over each team's own possessions
+  let FGA = 0, FGM = 0, TPA = 0, TPM = 0, OR = 0, DR = 0;
+  for (let c = 1; c <= 29; c++) { FGA += FG_ATT[c] * own[c]; FGM += FG_MADE[c] * own[c]; TPA += TP_ATT[c] * own[c]; TPM += TP_MADE[c] * own[c]; }
+  for (let c = 11; c <= 18; c++) OR += own[c];
+  for (let c = 20; c <= 23; c++) OR += own[c];
+  for (const c of DR_CODES) DR += opp[c];
+  let FTA = 2 * (own[1] + own[2] + own[3]) + 2 * (own[20] + own[21] + own[22] + own[23]) + own[24] - ftAdj.oneAndOneMiss;
+  const FTM = own[1] + 2 * own[2] + ftAdj.firstMade;
+  const TO = own[4] + own[5] + own[6] + own[29];
+  const ST = opp[6];
+  const POSS = Math.round(((FGA - OR) + TO + 0.437 * FTA) * 1000) / 1000;
+  return { FGM, FGA, TPM, TPA, FTM, FTA, OR, DR, TO, ST, POSS };
+}
+
+export function playRecordedGame(rowA, rowB, venue = "neutral", { seed = (Math.random() * 2 ** 32) >>> 0, keepLog = false } = {}) {
+  const m = matchup(rowA, rowB, venue), rand = makeRng(seed);
+  const cnt = { A: new Int16Array(30), B: new Int16Array(30) };
+  const adj = { A: { oneAndOneMiss: 0, firstMade: 0 }, B: { oneAndOneMiss: 0, firstMade: 0 } };
+  let ptsA = 0, ptsB = 0, clock = 2400, turn = "B";
+  const log = keepLog ? [] : null;
+  const periods = (c) => (c > 0 ? 0 : 1 + Math.floor(-c / OT_SECONDS));
+  for (let k = 0; k < 600; k++) {
+    const prev = clock, s = turn === "A" ? m.sA : m.sB;
+    const c = possession(s, rand);
+    const p = PT[c] + (c >= 20 && c <= 23 && lastFM ? 1 : 0);
+    cnt[turn][c]++;
+    if (c >= 20 && c <= 23) { if (lastFM) adj[turn].firstMade++; else if (lastOO) adj[turn].oneAndOneMiss++; }
+    clock -= SECS[c];
+    if (turn === "A") ptsA += p; else ptsB += p;
+    if (log) log.push({ t: prev, side: turn, code: c, pts: p, a: ptsA, b: ptsB });
+    if (clock < 1 && periods(clock) > periods(prev) && ptsA !== ptsB) break;
+    turn = turn === "A" ? "B" : "A";
+  }
+  const ot = Math.floor(-clock / OT_SECONDS);
+  return { ptsA, ptsB, ot: Math.max(0, ot), boxA: boxFromCodes(cnt.A, cnt.B, adj.A), boxB: boxFromCodes(cnt.B, cnt.A, adj.B), log, seed };
 }

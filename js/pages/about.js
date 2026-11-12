@@ -5,6 +5,7 @@ import { loadCore } from "../data.js";
   const view = shell("about");
   try {
     const core = await loadCore();
+    const sNow = core.season;
     view.innerHTML = `
       <div class="page-title"><span class="kicker">Under the hood</span><h1>How it works</h1>
         <p>Hardwood Sim is a college basketball world built on a possession-by-possession Monte Carlo engine, originally an Excel workbook, now ported to the browser.</p></div>
@@ -39,7 +40,7 @@ import { loadCore } from "../data.js";
           <div class="card"><div class="card-head"><h2>Logos</h2></div>
             <p class="muted" style="margin:0">Team logos are trademarks of their schools and are shown only to identify teams in this non-commercial fan project. They come from the open <a href="https://github.com/GreenGuitar0/CBB-Team-Logos" style="color:var(--accent)">CBB-Team-Logos</a> collection. Six newer or renamed programs fall back to monogram badges.</p></div>
           <div class="card"><div class="card-head"><h2>This site</h2></div>
-            <p class="muted" style="margin:0">The engine here is a JavaScript port of the workbook's Python copy, checked against it on 46 matchups (all within sampling error). Season 1 data is a snapshot exported from the Excel workbook: ${core.meta.gamesPlayed.toLocaleString()} games across ${core.meta.teams} teams, engine ${core.meta.version}.</p></div>
+            <p class="muted" style="margin:0">The engine here is a JavaScript port of the workbook's Python copy, checked against it on 46 matchups (all within sampling error). Season data is imported from the Excel workbook; later games are rolled by this site with the same engine. ${sNow.label}: ${sNow.played.toLocaleString()} of ${sNow.total.toLocaleString()} scheduled games played, engine ${core.meta.version}.</p></div>
         </div>
       </div>`;
   } catch (e) { fail(view, e); }

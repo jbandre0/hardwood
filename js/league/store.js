@@ -19,7 +19,9 @@ export async function loadOverlay(seasonId) {
   try { const raw = localStorage.getItem(LS + seasonId); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
 
+let asked = false;
 export async function saveOverlay(seasonId, overlay) {
+  if (!asked) { asked = true; protectStorage(); }
   overlay = { ...overlay, savedAt: new Date().toISOString() };
   try { const db = await openDB(); await tx(db, "readwrite", (s) => s.put(overlay, seasonId)); db.close(); return "indexeddb"; }
   catch { try { localStorage.setItem(LS + seasonId, JSON.stringify(overlay)); return "localstorage"; } catch (e) { throw new Error("Could not save to this browser: " + e.message); } }
@@ -78,3 +80,12 @@ export async function seasonMeta() {
   return { status: m.status || {}, local: m.local || [], current: m.current || null };
 }
 export async function updateSeasonMeta(fn) { const m = await seasonMeta(); fn(m); delete m.savedAt; await saveOverlay(META, m); return m; }
+
+/** Ask the browser not to clear this site's storage on its own (cleanup under disk pressure, Safari's idle-site purge). */
+export async function protectStorage() {
+  try {
+    if (!navigator.storage || !navigator.storage.persist) return "unsupported";
+    if (await navigator.storage.persisted()) return "protected";
+    return (await navigator.storage.persist()) ? "protected" : "not-protected";
+  } catch { return "unsupported"; }
+}

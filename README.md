@@ -25,7 +25,8 @@ Reads cached cell values only (no macros). Writes `data/league.json`, `data/seas
 1. Commissioner desk: the Game desk loads the next scheduled game as a preview (teams, records, ranks, ratings, form, the locked prediction). Play game rolls it once and logs it to the season immediately; then Load next game. Enter does the next step. Play one game does both in one click; Play day does a whole day. Finishing a day (any of the three ways) opens that day's recap: power top 25 with the day's movement, upsets, biggest movers, notables and every result, with a button to start the next day. Every game is a single engine roll; the thousands of simulations are only for the prediction locked before it (can be switched off on the desk).
 2. Rankings: cast the weekly AP ballot (a Power Poll snapshot is saved with it). Bracketology: suggest and save the weekly field. Articles: draft the weekly column from the numbers, edit, publish.
 3. After day 47: Build NCAA field (conference champions get the auto-bids; the rest from the Bracketology Board), then play days 48-54.
-4. Offseason: awards, tier review with overrides, settings, marquee games, then create the next season (a backup downloads first).
+4. Bracketology editions: Export for bracketology (Bracketology page or Commissioner desk), attach the file in a Claude session with this repo and say "do bracketology". The repo skill `.claude/skills/bracketology` reads the season (`tools/bracketology_brief.mjs`), writes the field and article, validates and publishes with `tools/publish_edition.mjs` into `data/editions.json`, and pushes to `main`. A published edition wins over anything made in the browser for that week.
+5. Offseason: awards, tier review with overrides, settings, marquee games, then create the next season (a backup downloads first).
 
 ## Tests
 ```bash

@@ -46,3 +46,5 @@ export function computeBoard({ teams, games, throughDay, picks, commAdj, setting
   }
   return { rows, lines: { q1, q2, bad } };
 }
+
+export const BOARD_DEFAULTS = { q1Rank: 25, q2Rank: 50, badLossRank: 100, winWeight: 8, q1Pts: 1.5, q2Pts: 0.75, badLossPts: 1.5, atLarge: 37, seedBump: 2 };

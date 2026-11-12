@@ -14,6 +14,8 @@ export async function loadSeasonData(id, loader, files = FILES) {
     try { out[f] = await loader(`data/seasons/${id}/${f}.json`); } catch { out[f] = null; }
   }));
   out.league = await loader("data/league.json");
+  // weekly bracketology editions published to the repo (data/editions.json, keyed by season id)
+  try { out.editions = ((await loader("data/editions.json")) || {})[id] || []; } catch { out.editions = []; }
   return out;
 }
 
@@ -39,8 +41,24 @@ export function createState(data, overlay = null) {
       g.ptsA = sc[0]; g.ptsB = sc[1]; box.set(id, overlay.box[id]); state.recorded.push(id); state.meta[id] = (overlay.meta || {})[id] || {};
     }
   }
+  applyEditions(state, data.editions || []);
   syncTournament(state);
   return state;
+}
+
+/**
+ * Published editions win for their weeks: their field replaces that week's picks, their article replaces that week's
+ * bracketology article, their AP ballot (if any) replaces that week's ballot. Not marked dirty: they live in the repo.
+ */
+export function applyEditions(state, editions) {
+  const C = state.content;
+  for (const e of [...editions].sort((a, b) => a.week - b.week)) {
+    C.picks = [...C.picks.filter((p) => p.week !== e.week), ...e.picks.map((p) => ({ ...p, week: e.week }))];
+    C.articles = [...C.articles.filter((a) => !((!a.type || /bracket/i.test(a.type)) && a.week === e.week)),
+      { type: "Bracketology", week: e.week, heading: e.week === 0 ? "Preseason" : `Week ${e.week}`, headline: e.headline, body: e.body, to: e.afterDay, publishedAt: e.publishedAt, edition: true }];
+    if (e.ap && e.ap.length) C.ap = [...C.ap.filter((b) => b.week !== e.week), { week: e.week, afterDay: e.afterDay, ranks: e.ap.slice() }].sort((a, b) => a.week - b.week);
+    if (e.commAdj) C.commAdj = [...C.commAdj.filter((a) => a.week !== e.week), ...e.commAdj.map((a) => ({ ...a, week: e.week }))];
+  }
 }
 
 export function toOverlay(state, extraGames = state.extraGames || []) {

@@ -6,7 +6,8 @@ import { computeBoard } from "../league/bracketology.js";
 import { suggestField, validateField } from "../league/field.js";
 import { lockDay, lockPrediction, DEFAULT_SIMS } from "../league/predictions.js";
 import { dayDone } from "../league/recap.js";
-import { saveOverlay, clearOverlay, exportAll, importAll, loadOverlay, unsavedSince } from "../league/store.js";
+import { buildSeasonExport } from "../league/export.js";
+import { saveOverlay, clearOverlay, exportAll, importAll, loadOverlay, unsavedSince, protectStorage } from "../league/store.js";
 
 const seed = () => crypto.getRandomValues(new Uint32Array(1))[0];
 const predOn = () => { try { return localStorage.getItem("hw-pred-on") !== "0"; } catch { return true; } };
@@ -93,9 +94,13 @@ const fmt = (n) => n.toLocaleString();
           <div class="card">
             <div class="card-head"><h2>Backup</h2></div>
             <p class="${unsaved ? "" : "muted"}" style="margin-top:0">${unsaved ? `<b style="color:var(--warm)">${unsaved} game${unsaved === 1 ? "" : "s"} recorded since your last backup.</b>` : state.recorded.length ? "Everything recorded here is in your last backup." : "Nothing recorded on this site yet."}</p>
+            <p style="font-size:.9rem;margin:0 0 8px" id="storageState"></p>
             <p class="muted" style="font-size:.9rem">Games are saved in this browser only. A backup file holds everything for every season. Clearing site data or switching browsers would lose it, so download a backup after each session.</p>
             <div class="btn-row"><button class="btn" id="exportBtn" type="button">Download backup</button><label class="btn ghost" for="importFile" style="cursor:pointer">Restore from backup</label><input id="importFile" type="file" accept="application/json,.json" hidden></div>
             <p class="status" id="bstatus" aria-live="polite"></p>
+            <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+            <p class="muted" style="margin:0 0 10px;font-size:.9rem">Bracketology week: download the season so far and attach it when you ask Claude to "do bracketology".</p>
+            <button class="btn ghost" id="exportBk" type="button">Export for bracketology</button>
           </div>
           ${complete ? "" : `<div class="card">
             <div class="card-head"><h2>Start over</h2></div>
@@ -114,6 +119,12 @@ const fmt = (n) => n.toLocaleString();
     const persist = async () => { await saveOverlay(season.id, toOverlay(state, state.extraGames || [])); };
     const busy = (on, msg) => { for (const id of ["playDay", "playOne", "undoOne", "undoDay"]) { const b = document.getElementById(id); if (b) b.disabled = on; } if (status) status.textContent = msg || ""; };
 
+    protectStorage().then((st) => { const el = document.getElementById("storageState"); if (el) el.innerHTML = st === "protected" ? '<span class="up">Storage is protected</span> <span class="muted">(the browser won\'t clear it on its own)</span>' : st === "not-protected" ? '<span class="down">Storage is not protected</span> <span class="muted">(the browser may clear it if it runs low on space; bookmark the site and back up often)</span>' : '<span class="muted">This browser can\'t protect storage; back up often.</span>'; });
+    document.getElementById("exportBk")?.addEventListener("click", () => {
+      const x = buildSeasonExport(state, { id: season.id, label: season.label, status: season.status });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(x)], { type: "application/json" }));
+      a.download = `hardwood-${season.id}-through-day-${x.throughDay}.json`; a.click();
+    });
     document.getElementById("predOn")?.addEventListener("change", (e) => { try { localStorage.setItem("hw-pred-on", e.target.checked ? "1" : "0"); } catch { /* ignore */ } });
     const simsBox = document.getElementById("cbSims");
     if (simsBox) combobox(simsBox, { id: "predSims", value: String(predSims()), searchable: false, options: [1000, 2000, 3000, 5000, 10000, 40000].map((n) => ({ value: String(n), label: n.toLocaleString() + (n === 40000 ? " (backtest standard, slow)" : "") })), onChange: (v) => { try { localStorage.setItem("hw-pred-sims", v); } catch { /* ignore */ } } });

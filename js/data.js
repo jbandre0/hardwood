@@ -13,11 +13,14 @@ export const ROUND_BY_DAY = { 48: "First Four", 49: "First Round", 50: "Second R
 export const REGIONS = ["East", "West", "South", "Midwest"];
 
 let corePromise;
+let LOGOS = {}; // team slug -> logo file in assets/logos/ (set by loadCore)
 export function loadCore() {
   if (!corePromise) corePromise = (async () => {
-    const [teams, g, meta, ncaa, polls] = await Promise.all([
+    const [teams, g, meta, ncaa, polls, logos] = await Promise.all([
       getJSON("teams"), getJSON("games"), getJSON("meta"), getJSON("ncaa"), getJSON("polls"),
+      getJSON("logos").catch(() => ({})), // logos are optional: a missing map just means monogram badges
     ]);
+    LOGOS = logos;
     const bySlug = new Map(teams.map((t) => [t.slug, t]));
     const games = g.rows.map((r) => {
       const [id, day, type, ctx, a, b, home, ptsA, ptsB] = r;
@@ -45,8 +48,17 @@ export function initials(name) {
   if (parts.length === 1) return parts[0].slice(0, 3);
   return parts.slice(0, 3).map((p) => p[0]).join("");
 }
-export const badge = (t, size) =>
-  `<span class="badge t-${esc(t.tier)}"${size ? ` style="--s:${size}px"` : ""} aria-hidden="true">${esc(initials(t.name))}</span>`;
+// Team badge: the school's logo when we have one, otherwise a monogram disc ringed by tier.
+// If a logo file fails to load, the <img> swaps itself for the monogram.
+export const badge = (t, size) => {
+  const style = size ? ` style="--s:${size}px"` : "";
+  const mono = initials(t.name);
+  const lg = LOGOS[t.slug];
+  if (lg) {
+    return `<span class="badge logo t-${esc(t.tier)}"${style}${lg.t ? ` data-tone="${lg.t}"` : ""} aria-hidden="true"><img src="assets/logos/${esc(lg.f)}" alt="" width="${size || 34}" height="${size || 34}" loading="lazy" decoding="async" onerror="this.parentNode.classList.remove('logo');this.replaceWith(document.createTextNode('${esc(mono)}'))"></span>`;
+  }
+  return `<span class="badge t-${esc(t.tier)}"${style} aria-hidden="true">${esc(mono)}</span>`;
+};
 export const teamLink = (t) => `<a class="team-link" href="team.html?t=${t.slug}">${badge(t)}<span>${esc(t.name)}</span></a>`;
 export const teamHref = (t) => `team.html?t=${t.slug}`;
 

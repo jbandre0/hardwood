@@ -34,5 +34,11 @@ Any static host works (Cloudflare Pages, GitHub Pages, Netlify). Publish the rep
 ## Engine rules (from the workbook's Project Notes)
 Engine constants are frozen at v9 for Season 1. Any engine change gets a new version number. Calculation notes, calibration history and known weaknesses live in the workbook's Method Write-up sheet.
 
+## Logos
+Team logos live in `assets/logos/` (359 of 365 teams; six newer or renamed programs use monogram badges). `data/logos.json` maps team slug to file and notes very dark or very light marks. Rebuild with `python3 tools/logo_map.py <path-to>/CBB-Team-Logos/pngs --write`. They are trademarks of their schools, used here only to identify teams in a non-commercial project; delete `assets/logos/` and `data/logos.json` to switch back to monograms.
+
+## Design research
+`research/FINDINGS.md` documents the AI-vs-human design-pattern study that shaped the visual design.
+
 ## Not built yet (v2)
 Prediction tracker for real 2026-27 games, polls/bracketology archive pages, live play-by-play viewer for recorded games, Season 2 offseason and history tables.

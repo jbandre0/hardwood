@@ -64,9 +64,9 @@ const LABELS = ["First Round", "Second Round", "Sweet 16", "Elite Eight"];
     const review = articleHTML(core.meta.article.body);
 
     view.innerHTML = `
-      <div class="page-title fade-in"><span class="eyebrow">Season 1 &middot; Days 48&ndash;54</span><h1>March Madness</h1>
+      <div class="page-title"><span class="kicker">Season 1 &middot; Days 48&ndash;54</span><h1>March Madness</h1>
         <p>Sixty-eight teams, seven days, one net. Peach seed numbers mark upsets. Scroll sideways on a phone.</p></div>
-      <div class="card fade-in" style="margin-bottom:18px;padding:22px 18px">
+      <div class="card" style="margin-bottom:18px;padding:22px 18px">
         <div class="bracket-scroll"><div class="bracket">
           ${regionHTML("East", false)}${regionHTML("West", true)}
           <div class="ff-center">
@@ -78,11 +78,11 @@ const LABELS = ["First Round", "Second Round", "Sweet 16", "Elite Eight"];
           ${regionHTML("South", false)}${regionHTML("Midwest", true)}
         </div></div>
       </div>
-      <div class="card fade-in" style="margin-bottom:18px">
+      <div class="card" style="margin-bottom:18px">
         <div class="card-head"><h2>First Four</h2><span class="muted">Day 48 &middot; Dayton</span></div>
         <div class="grid cols-2" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${first4.map(gameBox).join("")}</div>
       </div>
-      <div class="card fade-in" id="review">
+      <div class="card" id="review">
         <div class="card-head"><h2>${esc((core.meta.article.headline || "Tournament in review").split(":")[0])}</h2><span class="pill mint">Bracketology HQ</span></div>
         <p class="muted" style="margin-top:-6px">${esc(core.meta.article.headline || "")}</p>
         <div class="prose">${review}</div>

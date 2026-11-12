@@ -10,10 +10,10 @@ import { loadCore, esc, teamLink, signed, recordAsOf } from "../data.js";
     let week = core.polls.length - 1;
 
     view.innerHTML = `
-      <div class="page-title fade-in"><span class="eyebrow">Season 1 final</span><h1>Rankings</h1>
+      <div class="page-title"><span class="kicker">Season 1 final</span><h1>Rankings</h1>
         <p>Power ratings come from the sim itself: average margin plus the strength of everyone you played, solved for all 365 teams at once. The AP Top 25 is the committee's weekly poll.</p></div>
-      <div class="seg fade-in" style="margin-bottom:16px" id="tabs"><button type="button" data-t="power">Power ratings</button><button type="button" data-t="ap">AP Top 25</button></div>
-      <div class="card fade-in" id="panel"></div>`;
+      <div class="seg" style="margin-bottom:16px" id="tabs"><button type="button" data-t="power">Power ratings</button><button type="button" data-t="ap">AP Top 25</button></div>
+      <div class="card plain" id="panel"></div>`;
     const panel = document.getElementById("panel");
     const tabs = document.getElementById("tabs");
 

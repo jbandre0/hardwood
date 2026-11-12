@@ -209,7 +209,7 @@ export function predict(rowA, rowB, venue = "neutral", { n = 40000, seed = 1, hi
   const m = matchup(rowA, rowB, venue);
   const rand = makeRng(seed);
   let wins = 0, ties = 0, sumM = 0, sumM2 = 0, sumT = 0, sumA = 0, sumB = 0;
-  const HB = 41; // margin histogram: -40..+40 clipped
+  const HB = 60; // margin histogram: -60..+60 (anything beyond is clipped into the end bins)
   const h = new Uint32Array(HB * 2 + 1);
   const half = Math.floor(n / 2);
   for (let g = 0; g < half * 2; g++) {

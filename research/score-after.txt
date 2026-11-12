@@ -1,0 +1,7 @@
+leave-one-out accuracy on 200 repos using 24 visual features: 76% (chance 50%)
+
+Hardwood Sim (final): AI-likeness log-odds -4.5   (human repos: median -3.7, 90th pct +0.7 | AI repos: median +2.8, 10th pct -3.5)
+  percentile among human repos: 16% | among AI repos: 0%
+  features present, with evidence weight (positive = looks AI):
+    left_border_accent         +0.00
+  absent AI-typical features (nothing to fix): inter_font, serif_display, purple_palette, gradient_bg, gradient_text, gradient_multi_hue, blurred_glow_orbs, glassmorphism, colour_variety_high, big_rounded_majority, pill_badges, soft_big_shadows, hover_lift_scale, fade_in_animations, three_col_feature_grid, emoji_in_ui, marketing_buzzwords, em_dashes_in_copy, stat_counters_row

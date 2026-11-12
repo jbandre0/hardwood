@@ -35,17 +35,17 @@ const fmtClock = (p) => {
 };
 
 function histogram(h, nameA, nameB) {
-  const HB = 41, max = Math.max(...h), W = 600, H = 150, bw = W / h.length;
+  const HB = 60, max = Math.max(...h), W = 600, H = 150, bw = W / h.length;
   const bars = h.map((v, i) => {
     const m = i - HB, ht = (v / max) * (H - 18);
     const fill = m > 0 ? "var(--accent)" : m < 0 ? "var(--peach)" : "var(--faint)";
     return `<rect x="${(i * bw + 0.5).toFixed(1)}" y="${(H - ht - 14).toFixed(1)}" width="${(bw - 1).toFixed(1)}" height="${ht.toFixed(1)}" rx="1.5" fill="${fill}" opacity=".9"/>`;
   }).join("");
   const mid = HB * bw + bw / 2;
-  return `<svg class="hist" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Distribution of final margins across 40,000 simulated games">
+  return `<svg class="hist" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Distribution of final margins (Team A minus Team B) across 40,000 simulated games">
     ${bars}<line x1="${mid}" x2="${mid}" y1="4" y2="${H - 14}" stroke="var(--text)" stroke-opacity=".35" stroke-dasharray="3 3"/>
-    <text x="4" y="${H - 1}" fill="var(--faint)" font-size="11">${esc(nameB)} by 40+</text>
-    <text x="${W - 4}" y="${H - 1}" fill="var(--faint)" font-size="11" text-anchor="end">${esc(nameA)} by 40+</text></svg>`;
+    ${[-40, -20, 0, 20, 40].map((v) => `<text x="${((v + HB) * bw + bw / 2).toFixed(1)}" y="${H - 1}" fill="var(--faint)" font-size="11" text-anchor="middle">${v > 0 ? "+" + v : v}</text>`).join("")}
+    </svg>`;
 }
 
 (async function main() {
@@ -61,9 +61,9 @@ function histogram(h, nameA, nameB) {
 
     const opts = (sel) => ranked.map((t) => `<option value="${t.slug}"${t === sel ? " selected" : ""}>#${t.rank} ${esc(t.name)} (${esc(t.conf)})</option>`).join("");
     view.innerHTML = `
-      <div class="page-title fade-in"><span class="eyebrow">Matchup simulator</span><h1>Tip it off</h1>
+      <div class="page-title"><span class="kicker">Matchup simulator</span><h1>Tip it off</h1>
         <p>Pick any two of the 365 teams and a venue. The engine plays 40,000 games, one possession at a time, and tells you who wins and by how much.</p></div>
-      <div class="card fade-in" style="margin-bottom:18px">
+      <div class="card" style="margin-bottom:18px">
         <div class="versus">
           <div class="field"><label for="selA">Team A</label><select id="selA">${opts(A)}</select></div>
           <div class="vs">VS</div>
@@ -106,7 +106,7 @@ function histogram(h, nameA, nameB) {
       const spread = r.margin;
       const venueNote = venue === "neutral" ? "Neutral court" : `${(venue === "A_home" ? A : B).name} at home`;
       out.innerHTML = `
-        <div class="card fade-in" style="margin-bottom:18px">
+        <div class="card" style="margin-bottom:18px">
           <div class="matchup-head">
             <div class="mh-team">${badge(A, 62)}<div><h2>${esc(A.name)}</h2><small>${esc(A.conf)} &middot; Tier ${esc(A.tier)} &middot; ${A.w}-${A.l}</small></div></div>
             <span class="pill">${esc(venueNote)}</span>
@@ -119,7 +119,7 @@ function histogram(h, nameA, nameB) {
           </div>
           <p class="muted" style="margin:14px 0 0"><b style="color:var(--text)">${esc(fav.name)}</b> wins ${pct(fp)} of the time, by an average of ${Math.abs(spread).toFixed(1)}.</p>
         </div>
-        <div class="grid cols-main fade-in">
+        <div class="grid cols-main">
           <div class="stack">
             <div class="card"><div class="kpis">
               <div class="kpi"><small>Projected score</small><b>${r.scoreA.toFixed(0)}-${r.scoreB.toFixed(0)}</b></div>
@@ -153,7 +153,7 @@ function histogram(h, nameA, nameB) {
         gameEl.querySelector(".pbp").innerHTML = rows;
       };
       gameEl.innerHTML = `
-        <div class="scoreboard fade-in">
+        <div class="scoreboard">
           <div><div class="sb-team">${esc(A.name)}</div><div class="sb-pts" ${g.scoreA < g.scoreB ? 'style="color:var(--faint)"' : ""}>${g.scoreA}</div></div>
           <div class="sb-mid">FINAL${g.ot ? ` / ${g.ot > 1 ? g.ot : ""}OT` : ""}</div>
           <div><div class="sb-team">${esc(B.name)}</div><div class="sb-pts" ${g.scoreB < g.scoreA ? 'style="color:var(--faint)"' : ""}>${g.scoreB}</div></div>

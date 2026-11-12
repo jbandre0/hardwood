@@ -10,11 +10,13 @@ let pass = 0, fail = 0; const ok = (c, m) => { c ? pass++ : (fail++, console.log
   await p.goto(BASE + 'play.html', { waitUntil: 'networkidle' }); await p.waitForSelector('#playDay');
   const txt0 = await p.locator('main').innerText();
   ok(/1,290/.test(txt0) && /Play day 14/.test(txt0), 'starts at 1,290 games with day 14 next');
-  await p.click('#playDay'); await p.waitForFunction(() => /recorded and saved/.test(document.getElementById('status')?.textContent || ''), null, { timeout: 30000 });
+  await p.click('#playDay'); await p.waitForURL(/recap\.html\?day=14/, { timeout: 120000 }); await p.waitForSelector('h1');
+  ok(/Day 14 is in the books/i.test(await p.locator('main').innerText()), 'Play day opens the day 14 recap');
+  await p.goto(BASE + 'play.html', { waitUntil: 'networkidle' }); await p.waitForSelector('#kPlayed');
   const txt1 = await p.locator('main').innerText();
   const m = txt1.match(/Games played\s+([\d,]+)/); const played = m ? +m[1].replace(/,/g, '') : 0;
   ok(played > 1290 && played < 1500, `games played rose to ${played}`);
-  ok(/day 14 results/i.test(txt1) && /recorded on this site/i.test(txt1), 'results and recorded list shown');
+  ok(/recorded on this site/i.test(txt1), 'recorded list shown on the desk');
   await p.screenshot({ path: process.env.SHOT || '/tmp/runner.png', fullPage: false });
   // box score dialog
   await p.locator('tr.clickable td.num').first().click(); await p.waitForSelector('dialog[open]');

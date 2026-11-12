@@ -26,6 +26,9 @@ export function createState(data, overlay = null) {
   const games = data.games.rows.map(toGame);
   const box = new Map(data.box.rows.map((r) => [r[0], r]));
   const state = { data, games, byId: new Map(games.map((g) => [g.id, g])), box, S: data.settings, recorded: [], meta: {}, cache: null };
+  state.content = baseContent(data);
+  state.contentDirty = new Set();
+  if (overlay && overlay.content) for (const [k, v] of Object.entries(overlay.content)) { state.content[k] = v; state.contentDirty.add(k); }
   if (overlay) {
     for (const g of overlay.extraGames || []) { const x = toGame(g); state.games.push(x); state.byId.set(x.id, x); }
     for (const id of overlay.order || []) {
@@ -40,6 +43,7 @@ export function createState(data, overlay = null) {
 export function toOverlay(state, extraGames = []) {
   const o = { format: 1, season: state.data.id, games: {}, box: {}, order: state.recorded.slice(), meta: {}, extraGames };
   for (const id of state.recorded) { const g = state.byId.get(id); o.games[id] = [g.ptsA, g.ptsB]; o.box[id] = state.box.get(id); o.meta[id] = state.meta[id]; }
+  if (state.contentDirty && state.contentDirty.size) { o.content = {}; for (const k of state.contentDirty) o.content[k] = state.content[k]; }
   return o;
 }
 
@@ -124,3 +128,35 @@ export function undoLast(state, count = 1) {
 }
 
 export { ENG };
+
+
+// ---------------------------------------------------------------------------------------------- editable content
+// Ballots, bracketology picks, committee adjustments and articles. The baseline comes from the season's data files (or, for a
+// closed season with no live files, from its archive); anything edited in the browser replaces that list wholesale.
+const clone = (x) => JSON.parse(JSON.stringify(x));
+function baseContent(data) {
+  const ap = clone((data.polls && data.polls.ap) || []);
+  const power = clone((data.polls && data.polls.power) || []);
+  let picks = clone((data.bracketology && data.bracketology.picks) || []);
+  let articles = clone((data.bracketology && data.bracketology.articles) || []);
+  const commAdj = clone((data.bracketology && data.bracketology.commAdj) || []);
+  const arch = data.archive;
+  if (!picks.length && arch && arch.bracketHistory) {
+    picks = arch.bracketHistory.map((r) => ({ week: r.Week, group: r.Group, team: r["Team id"], seed: r.Seed, region: r.Region, bid: r.Bid, ff: r["FF Game"], bubble: r["Bubble Rank"], note: r.Note }));
+  }
+  if (!articles.length && arch && arch.articles) {
+    articles = arch.articles.map((r) => {
+      const wk = /^Week (\d+)/.exec(r.Heading || "");
+      return { type: r.Type, week: wk ? +wk[1] : null, heading: r.Heading, headline: r["Title / Matchup"], body: r.Text };
+    });
+  }
+  const weeks = {};
+  for (const b of ap) weeks[b.week] = b.afterDay;
+  return { ap, power, picks, articles, commAdj, weeks };
+}
+
+/** Replace one content list (ap, power, picks, articles, commAdj) and mark it to be saved. */
+export function setContent(state, key, value) {
+  state.content[key] = value;
+  state.contentDirty.add(key);
+}

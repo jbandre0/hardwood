@@ -324,6 +324,13 @@ def main(path, season_label):
         if not r[1] or not isinstance(r[2], (int, float)) or r[7] is None: break
         power.append(dict(conf=r[1], teams=r[2], ncW=r[3], ncL=r[4], ncPct=r_(r[5], 9), avgRating=r_(r[6], 9), avgTier=r_(r[7], 9), rank=r[8]))
     fx["standings"] = dict(conf=conf_sel, order=order, power=power)
+    # Bracketology Board (resume scoring) for the week selected in the workbook
+    _, brows = w.table("Bracketology Board", "At-large Rank")
+    board_rows = {}
+    for r in brows:
+        if r.get("Team") in tid and r.get("Score") is not None:
+            board_rows[r["Team"]] = {k: (r_(v, 9) if isinstance(v, float) else v) for k, v in r.items() if k in ("Conf", "W", "L", "Win%", "Conf W", "Conf L", "Rating", "SOS", "Q1 W", "Q2 W", "Bad L", "Adj", "Score", "Bid", "At-large Rank", "Status", "Seed Score")}
+    fx["board"] = dict(settings=board_settings, lines=dict(q1=bs(6, 4), q2=bs(7, 4), bad=bs(8, 4)), rows=board_rows)
     dump(os.path.join(FIX, "season2-workbook-expected.json"), fx)
     # calibration log (1,000 frozen avg-vs-avg games) for box-score distribution tests
     _, cal = w.table("Calibration Log", "Engine POSS")

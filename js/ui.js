@@ -21,6 +21,7 @@ const NAV = [
   ["matchup", "Matchup Sim", "matchup.html", "vs"],
   ["rankings", "Rankings", "rankings.html", "rank"],
   ["standings", "Standings", "standings.html", "stand"],
+  ["bracketology", "Bracketology", "bracketology.html", "bracket"],
   ["bracket", "March Madness", "bracket.html", "bracket"],
   ["play", "Commissioner", "play.html", "play"],
   ["about", "How it works", "about.html", "info"],

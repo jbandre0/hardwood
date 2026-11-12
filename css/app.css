@@ -344,3 +344,5 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
 
 tr.upcoming td { color: var(--muted); }
 tr.upcoming a { color: var(--muted); }
+.bk-team { display: grid; grid-template-columns: 26px 1fr auto auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.bk-team .sd { font: 800 .9rem var(--display); color: var(--accent); }

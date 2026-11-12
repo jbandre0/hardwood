@@ -71,7 +71,7 @@ async function buildCore(seasonId) {
   const confs = [...new Set(teams.map((t) => t.conf))].sort((x, y) => x.localeCompare(y));
   const season = { id, label: info ? info.label : id, status: info ? info.status : "complete", day: lastPlayedDay(state), played: playedCount(state), total: state.games.length, regularSeasonDays: 42 };
   const meta = { ...(data.meta || {}), version: (data.meta && data.meta.version) || "v9" };
-  const polls = (data.polls && data.polls.ap) || [];
+  const polls = state.content.ap;
   return { season, teams, bySlug, games, teamGames, meta, ncaa, polls, seed, confs, state, calc: c, data, overlay, league: L };
 }
 

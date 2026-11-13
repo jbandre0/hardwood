@@ -412,6 +412,12 @@ tr.on-deck td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .mv.up { color: var(--mint, #6FCF97); } .mv.down { color: #e07a7a; } .mv.new, .mv.in { color: var(--peach, #FFD6A5); } .mv.out { color: #e07a7a; } .mv.same { color: var(--faint); font-weight: 500; }
 .game .tm .pts .mv { font-size: .66rem; letter-spacing: -.02em; }
 .game .tm.aq { box-shadow: inset 2px 0 0 var(--peach, #FFD6A5); }
+/* light mode: peach text is unreadable on cream, so peach labels turn dark green (dark-backed boxes like the hero keep peach) */
+:root[data-theme="light"] .mv.new, :root[data-theme="light"] .mv.in, :root[data-theme="light"] .game .tm.upset .sd,
+:root[data-theme="light"] .wv-run, :root[data-theme="light"] .wv-play.three .txt b { color: #1f6b4e; }
+:root[data-theme="light"] .game .tm.aq { box-shadow: inset 2px 0 0 #1f6b4e; }
+:root[data-theme="light"] .prob-track i + i { background: var(--warm); }
+:root[data-theme="light"] .mv.up { color: var(--accent); }
 .chg-h { font: 700 .8rem var(--body); text-transform: uppercase; letter-spacing: .05em; margin: 0 0 6px; color: var(--muted); }
 .chg-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: .9rem; }
 .bk-team { grid-template-columns: 26px 1fr auto auto; }

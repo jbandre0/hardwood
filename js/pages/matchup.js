@@ -39,7 +39,7 @@ function histogram(h, nameA, nameB) {
   const HB = 60, max = Math.max(...h), W = 600, H = 150, bw = W / h.length;
   const bars = h.map((v, i) => {
     const m = i - HB, ht = (v / max) * (H - 18);
-    const fill = m > 0 ? "var(--accent)" : m < 0 ? "var(--peach)" : "var(--faint)";
+    const fill = m > 0 ? "var(--accent)" : m < 0 ? "var(--warm)" : "var(--faint)";
     return `<rect x="${(i * bw + 0.5).toFixed(1)}" y="${(H - ht - 14).toFixed(1)}" width="${(bw - 1).toFixed(1)}" height="${ht.toFixed(1)}" rx="1.5" fill="${fill}" opacity=".9"/>`;
   }).join("");
   const mid = HB * bw + bw / 2;

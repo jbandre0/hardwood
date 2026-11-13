@@ -1,5 +1,5 @@
 import { shell, fail } from "../ui.js";
-import { loadAllSeasons, esc, teamLink, signed } from "../data.js";
+import { loadAllSeasons, esc, teamLinkPlain as teamLink, signed } from "../data.js";
 import { combobox } from "../combobox.js";
 import { titlesTable, allTime, mostImproved, streaks, headToHead } from "../league/history.js";
 

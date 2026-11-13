@@ -75,3 +75,29 @@ export function changeLabel(cur, prev) {
   const d = prev.seed - cur.seed;
   return d > 0 ? `▲ ${d}` : d < 0 ? `▼ ${-d}` : "—";
 }
+
+/**
+ * How one team's placement changed since the previous week: {kind, n, short, long}.
+ * kind: up | down | same | new | in | out; short is for tight spaces ("▲2"), long is words ("Up 2", "Out, was a 6 seed").
+ */
+export function movement(cur, prev) {
+  if (!prev) return { kind: "new", n: 0, short: "NEW", long: "New to the board" };
+  const cf = cur.group === "Field", pf = prev.group === "Field";
+  if (cf && pf) { const d = prev.seed - cur.seed; return d > 0 ? { kind: "up", n: d, short: `▲${d}`, long: `Up ${d}` } : d < 0 ? { kind: "down", n: -d, short: `▼${-d}`, long: `Down ${-d}` } : { kind: "same", n: 0, short: "", long: "No change" }; }
+  if (cf) return { kind: "in", n: 0, short: "IN", long: `In (was ${prev.group.toLowerCase()})` };
+  if (pf) return { kind: "out", n: 0, short: "OUT", long: `Out (was a ${prev.seed} seed)` };
+  if (prev.group !== cur.group) { const up = cur.group === "First Four Out"; return { kind: up ? "up" : "down", n: 1, short: up ? "▲" : "▼", long: up ? "Up to the first four out" : "Down to the next four out" }; }
+  const d = (prev.bubble ?? 0) - (cur.bubble ?? 0);
+  return d > 0 ? { kind: "up", n: d, short: `▲${d}`, long: `Up ${d}` } : d < 0 ? { kind: "down", n: -d, short: `▼${-d}`, long: `Down ${-d}` } : { kind: "same", n: 0, short: "", long: "No change" };
+}
+
+/** the week's changes as lists: moved up / down (biggest first), newly in the field, dropped out of it */
+export function fieldChanges(cur, prev) {
+  const pm = new Map(prev.map((p) => [p.team, p])), field = cur.filter((p) => p.group === "Field"), out = { up: [], down: [], newIn: [], dropped: [], same: [] };
+  for (const p of field) { const m = movement(p, pm.get(p.team)); const row = { team: p.team, seed: p.seed, was: pm.get(p.team) || null, m };
+    if (m.kind === "up") out.up.push(row); else if (m.kind === "down") out.down.push(row); else if (m.kind === "in" || m.kind === "new") out.newIn.push(row); else out.same.push(row); }
+  const nowIds = new Set(field.map((p) => p.team));
+  for (const p of prev) if (p.group === "Field" && !nowIds.has(p.team)) out.dropped.push({ team: p.team, was: p, now: cur.find((c) => c.team === p.team) || null });
+  out.up.sort((a, b) => b.m.n - a.m.n || a.seed - b.seed); out.down.sort((a, b) => b.m.n - a.m.n || a.seed - b.seed); out.dropped.sort((a, b) => a.was.seed - b.was.seed);
+  return out;
+}

@@ -1,5 +1,5 @@
 // Watch mode viewer: plays a broadcast (see league/watch.js) into a container, possession by possession.
-import { esc, badge } from "./data.js";
+import { esc, badge, apTag } from "./data.js";
 import { buildBroadcast, storyLines, clockLabel } from "./league/watch.js";
 
 const SPEEDS = [["Broadcast", 10], ["Quick", 25], ["Fast", 70], ["Blur", 400]];
@@ -19,9 +19,9 @@ export function startWatch(box, o) {
   box.innerHTML = `
     <div class="card-head"><h2>${esc(o.header.title)}</h2><span class="muted">${esc(o.header.sub)}</span></div>
     <div class="wv-board" role="group" aria-label="Scoreboard">
-      <div class="wv-team" data-s="A">${badge(A, 44)}<div><b>${esc(A.name)}</b><span class="muted">${esc(o.records.A)}</span></div><i class="wv-ball" aria-hidden="true"></i><span class="wv-pts" id="wvA">0</span></div>
+      <div class="wv-team" data-s="A">${badge(A, 44)}<div><b>${apTag(A)}${esc(A.name)}</b><span class="muted">${esc(o.records.A)}</span></div><i class="wv-ball" aria-hidden="true"></i><span class="wv-pts" id="wvA">0</span></div>
       <div class="wv-mid"><b id="wvClock" role="timer">1H 20:00</b><span id="wvState" class="muted">Tip-off</span></div>
-      <div class="wv-team" data-s="B">${badge(B, 44)}<div><b>${esc(B.name)}${game.home ? ' <span class="faint" style="font-weight:500">(home)</span>' : ""}</b><span class="muted">${esc(o.records.B)}</span></div><i class="wv-ball" aria-hidden="true"></i><span class="wv-pts" id="wvB">0</span></div>
+      <div class="wv-team" data-s="B">${badge(B, 44)}<div><b>${apTag(B)}${esc(B.name)}${game.home ? ' <span class="faint" style="font-weight:500">(home)</span>' : ""}</b><span class="muted">${esc(o.records.B)}</span></div><i class="wv-ball" aria-hidden="true"></i><span class="wv-pts" id="wvB">0</span></div>
     </div>
     <svg class="wv-wp" id="wvWp" viewBox="0 0 600 84" preserveAspectRatio="none" role="img" aria-label="Win probability over the game"><line x1="0" y1="42" x2="600" y2="42" class="mid"/><path id="wvArea" d="" class="area"/><path id="wvLine" d="" class="line" fill="none"/></svg>
     <div class="wv-wplabels"><span>${esc(A.name)}</span><span id="wvWpNow" class="muted">50% (estimate)</span><span>${esc(B.name)}</span></div>

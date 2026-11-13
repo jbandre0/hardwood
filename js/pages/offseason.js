@@ -1,5 +1,5 @@
 import { shell, fail } from "../ui.js";
-import { loadCore, resetCores, esc, teamLink, signed, seasonsIndex, fetchJSON, setActiveSeason } from "../data.js";
+import { loadCore, resetCores, esc, teamLinkPlain as teamLink, signed, seasonsIndex, fetchJSON, setActiveSeason } from "../data.js";
 import { combobox } from "../combobox.js";
 import { setContent, toOverlay } from "../league/league.js";
 import { seasonSummary } from "../league/summary.js";

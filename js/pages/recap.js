@@ -1,5 +1,5 @@
 import { shell, fail } from "../ui.js";
-import { loadCore, loadAllSeasons, esc, teamLink, signed, roundOf } from "../data.js";
+import { loadCore, loadAllSeasons, esc, teamLinkPlain as teamLink, signed, roundOf, apName } from "../data.js";
 import { gameRows, brokenOn } from "../league/leaders.js";
 import { autoBackup } from "../folder-backup.js";
 import { dayRecap, dayDone } from "../league/recap.js";
@@ -20,7 +20,7 @@ import { dayRecap, dayDone } from "../league/recap.js";
     const finished = !R.nextDay;
     view.innerHTML = `
       <div class="page-title"><span class="kicker">${esc(season.label)} &middot; ${R.games.length} games</span><h1>Day ${day} is in the books</h1>
-        <p>${top ? `Upset of the day: <b>${esc(teams[top.w].name)}</b> beat ${esc(teams[top.l].name)} ${Math.max(top.ptsA, top.ptsB)}-${Math.min(top.ptsA, top.ptsB)}, a ${pct(top.pWin)} shot going in. ` : ""}${R.upsets.length} upset${R.upsets.length === 1 ? "" : "s"} in all, ${R.overtime.length} overtime game${R.overtime.length === 1 ? "" : "s"}, home teams ${R.homeRecord}. ${R.fellUnbeaten.length ? `Lost their perfect record: ${R.fellUnbeaten.map((x) => esc(x.name)).join(", ")}. ` : ""}${R.unbeatenNow} unbeaten left${R.unbeatenBefore !== R.unbeatenNow ? ` (was ${R.unbeatenBefore})` : ""}.</p></div>
+        <p>${top ? `Upset of the day: <b>${esc(apName(teams[top.w]))}</b> beat ${esc(apName(teams[top.l]))} ${Math.max(top.ptsA, top.ptsB)}-${Math.min(top.ptsA, top.ptsB)}, a ${pct(top.pWin)} shot going in. ` : ""}${R.upsets.length} upset${R.upsets.length === 1 ? "" : "s"} in all, ${R.overtime.length} overtime game${R.overtime.length === 1 ? "" : "s"}, home teams ${R.homeRecord}. ${R.fellUnbeaten.length ? `Lost their perfect record: ${R.fellUnbeaten.map((x) => esc(x.name)).join(", ")}. ` : ""}${R.unbeatenNow} unbeaten left${R.unbeatenBefore !== R.unbeatenNow ? ` (was ${R.unbeatenBefore})` : ""}.</p></div>
       <div class="card" style="margin-bottom:18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
         <div class="btn-row">
           ${finished ? `<a class="btn" href="play.html">Back to the desk</a>` : `<a class="btn" id="goNext" href="play.html">Start day ${R.nextDay} (${R.nextGames} games)</a>`}

@@ -1,8 +1,8 @@
 import { shell, fail } from "../ui.js";
-import { loadCore, resetCores, esc, teamLink, articleHTML, signed } from "../data.js";
+import { loadCore, resetCores, esc, teamLinkPlain as teamLink, articleHTML, signed } from "../data.js";
 import { combobox } from "../combobox.js";
 import { computeBoard } from "../league/bracketology.js";
-import { suggestField, validateField, changeLabel, REGIONS } from "../league/field.js";
+import { suggestField, validateField, movement, fieldChanges, REGIONS } from "../league/field.js";
 import { setContent, toOverlay } from "../league/league.js";
 import { saveOverlay } from "../league/store.js";
 import { downloadSeasonExport } from "../export-download.js";
@@ -30,7 +30,7 @@ import { downloadSeasonExport } from "../export-download.js";
       const wk = weeks(), cur = picksAll().filter((p) => p.week === week), prev = picksAll().filter((p) => p.week === week - 1);
       const pm = new Map(prev.map((p) => [p.team, p]));
       const art = state.content.articles.find((a) => (!a.type || /bracket/i.test(a.type)) && a.week === week);
-      const cell = (p) => { const t = teams[p.team]; const ch = changeLabel(p, pm.get(p.team)); return `<div class="bk-team">${p.seed ? `<span class="sd">${p.seed}</span>` : ""}${teamLink(t)}<span class="faint" style="font-size:.78rem">${p.bid === "Auto" ? "Auto" : ""}${p.ff ? " FF" : ""}</span><span class="${ch.startsWith("▲") ? "up" : ch.startsWith("▼") ? "down" : "faint"}" style="font-size:.78rem">${ch}</span></div>`; };
+      const cell = (p) => { const t = teams[p.team], m = movement(p, pm.get(p.team)); return `<div class="bk-team">${p.seed ? `<span class="sd">${p.seed}</span>` : '<span></span>'}${teamLink(t)}<span class="faint" style="font-size:.78rem">${p.bid === "Auto" ? "Auto bid" : ""}${p.ff ? " First Four" : ""}</span><span class="mv ${m.kind}" title="${esc(m.long)}">${m.kind === "same" ? "no change" : esc(m.long)}</span></div>`; };
       const field = cur.filter((p) => p.group === "Field");
       const regionCard = (R) => `<div class="card"><div class="card-head"><h2>${R}</h2></div>${field.filter((p) => p.region === R).sort((a, b) => a.seed - b.seed).map(cell).join("")}</div>`;
       const group = (g) => cur.filter((p) => p.group === g).sort((a, b) => (a.bubble ?? 0) - (b.bubble ?? 0)).map(cell).join("") || '<span class="muted">None</span>';
@@ -47,6 +47,7 @@ import { downloadSeasonExport } from "../export-download.js";
         ${val.errors.length ? `<div class="card" style="margin-bottom:18px;border-color:var(--down)"><b>Field problems</b><ul>${val.errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul></div>` : ""}
         <div class="seg" style="margin-bottom:14px" id="modes"><button type="button" data-m="bracket" class="${mode === "bracket" ? "on" : ""}">Bracket</button><button type="button" data-m="list" class="${mode === "list" ? "on" : ""}">Seed list</button></div>
         ${mode === "bracket" ? projectedBracket(field, pm) : `<div class="grid cols-2" style="margin-bottom:18px">${REGIONS.map(regionCard).join("")}</div>`}
+        ${changesCard(cur, prev)}
         <div class="grid cols-2" style="margin-bottom:18px"><div class="card"><div class="card-head"><h2>First Four Out</h2></div>${group("First Four Out")}</div><div class="card"><div class="card-head"><h2>Next Four Out</h2></div>${group("Next Four Out")}</div></div>
         ${art ? `<div class="card"><div class="card-head"><h2>${esc(art.headline || art.heading || "This week")}</h2></div><div class="prose">${articleHTML(art.body)}</div></div>` : ""}`}`;
       if (wk.length) combobox(document.getElementById("cbWk"), { id: "wk", value: String(week), options: wk.map((w) => ({ value: String(w), label: w === 0 ? "Preseason" : "Week " + w })), onChange: (v) => { week = +v; render(); } });
@@ -56,19 +57,32 @@ import { downloadSeasonExport } from "../export-download.js";
       if (editing) wireEditor();
     }
 
+    function changesCard(cur, prev) {
+      if (!prev.length) return "";
+      const C = fieldChanges(cur, prev), nm = (id) => teamLink(teams[id]);
+      const list = (rows, f) => rows.length ? rows.map((r) => `<div class="chg-row">${nm(r.team)}<span class="faint">${f(r)}</span></div>`).join("") : '<p class="faint" style="margin:4px 0 0">None</p>';
+      return `<div class="card" style="margin-bottom:18px"><div class="card-head"><h2>What changed since week ${week - 1}</h2><span class="muted">${C.up.length} up, ${C.down.length} down, ${C.newIn.length} new, ${C.dropped.length} out, ${C.same.length} unchanged</span></div>
+        <div class="grid cols-2" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px">
+          <div><h3 class="chg-h up">Moved up</h3>${list(C.up, (r) => `<span class="mv up">Up ${r.m.n}</span> ${r.was.seed} to ${r.seed} seed`)}</div>
+          <div><h3 class="chg-h down">Moved down</h3>${list(C.down, (r) => `<span class="mv down">Down ${r.m.n}</span> ${r.was.seed} to ${r.seed} seed`)}</div>
+          <div><h3 class="chg-h new">Newly in the field</h3>${list(C.newIn, (r) => `<span class="mv new">${r.was ? esc(r.was.group) : "new to the board"}</span> now a ${r.seed} seed`)}</div>
+          <div><h3 class="chg-h out">Dropped out</h3>${list(C.dropped, (r) => `<span class="mv out">Out</span> was a ${r.was.seed} seed${r.now ? `, now ${esc(r.now.group.toLowerCase())}` : ""}`)}</div>
+        </div></div>`;
+    }
+
     // The projected field drawn exactly like the March Madness bracket: first-round matchups in bracket order, later
     // rounds empty, First Four slots shown as "A / B".
     function projectedBracket(field, prevMap) {
       const PAIRS = [[1, 16], [8, 9], [5, 12], [4, 13], [6, 11], [3, 14], [7, 10], [2, 15]];
       const LABELS = ["First Round", "Second Round", "Sweet 16", "Elite Eight"];
       const at = (R, sd) => field.filter((p) => p.region === R && p.seed === sd);
-      const moveTag = (p) => { const ch = changeLabel(p, prevMap.get(p.team)); return ch === "—" ? "" : ` (${ch.replace("▲ in", "new").replace("NEW", "new")})`; };
+      const mvSpan = (p) => { const m = movement(p, prevMap.get(p.team)); return m.short ? `<span class="mv ${m.kind}">${esc(m.short)}</span>` : ""; };
       const slot = (R, sd) => {
         const ps = at(R, sd);
         if (!ps.length) return `<div class="tm lose"><span class="sd">${sd}</span><span class="nm faint">open</span><span class="pts"></span></div>`;
-        if (ps.length === 1) { const p = ps[0], t = teams[p.team]; return `<a class="tm win" href="team.html?t=${t.slug}" title="${esc(t.name)} ${t.w}-${t.l}${p.bid === "Auto" ? ", automatic bid" : ""}${esc(moveTag(p))}"><span class="sd">${sd}</span><span class="nm">${esc(t.name)}</span><span class="pts">${p.bid === "Auto" ? '<span class="faint" style="font-size:.7rem">AQ</span>' : ""}</span></a>`; }
+        if (ps.length === 1) { const p = ps[0], t = teams[p.team], m = movement(p, prevMap.get(p.team)); return `<a class="tm win ${p.bid === "Auto" ? "aq" : ""}" href="team.html?t=${t.slug}" title="${esc(t.name)} ${t.w}-${t.l}${p.bid === "Auto" ? ", automatic bid" : ""}. ${esc(m.long)} since last week"><span class="sd">${sd}</span><span class="nm">${esc(t.name)}</span><span class="pts">${mvSpan(p)}</span></a>`; }
         const names = ps.map((p) => teams[p.team].name);
-        return `<div class="tm win ff-slot" title="First Four: ${esc(names.join(" vs "))}"><span class="sd">${sd}</span><span class="nm">${esc(names.join(" / "))}</span><span class="pts"><span class="pill warm" style="font-size:.62rem;padding:1px 5px">FF</span></span></div>`;
+        return `<div class="tm win ff-slot ${ps.every((p) => p.bid === "Auto") ? "aq" : ""}" title="First Four: ${esc(ps.map((p) => `${teams[p.team].name} (${movement(p, prevMap.get(p.team)).long})`).join(" vs "))}"><span class="sd">${sd}</span><span class="nm">${esc(names.join(" / "))}</span><span class="pts">${ps.map(mvSpan).join(" ")}</span></div>`;
       };
       const empty = `<div class="game"><div class="tm"><span class="sd"></span><span class="nm faint">&nbsp;</span><span class="pts"></span></div><div class="tm"><span class="sd"></span><span class="nm faint">&nbsp;</span><span class="pts"></span></div></div>`;
       const region = (R, flip) => {
@@ -87,7 +101,7 @@ import { downloadSeasonExport } from "../export-download.js";
               ${ffGames.length ? `<div class="crown" style="margin-top:14px">First Four (Dayton)</div>${ffGames.map((g) => `<div style="font-size:.85rem;margin:4px 0">${g[0].seed}: ${esc(teams[g[0].team].name)} vs ${esc(teams[g[1].team].name)}</div>`).join("")}` : ""}</div>
             <div class="muted" style="text-align:center"><div class="round-label">Final Four</div>West vs Midwest</div></div>
           ${region("South", false)}${region("Midwest", true)}
-        </div></div><p class="faint" style="margin:12px 0 0;font-size:.82rem">AQ = automatic qualifier (projected conference champion). FF = First Four game, winner takes the slot. Scroll sideways on a phone.</p></div>`;
+        </div></div><p class="faint" style="margin:12px 0 0;font-size:.82rem"><span class="mv up">▲2</span> moved up two seed lines since last week, <span class="mv down">▼2</span> down two, <span class="mv new">NEW</span> / <span class="mv in">IN</span> newly in the field. A peach edge marks an automatic bid (projected conference champion). Two names in one slot are a First Four game. Scroll sideways on a phone.</p></div>`;
     }
 
     function editor() {

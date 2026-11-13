@@ -70,10 +70,11 @@ async function buildCore(seasonId) {
   const c = calc(state);
   const L = data.league;
   const nm = (i) => (i === null || i === undefined ? "—" : `#${c.teams[i].stats.rank ?? "?"} ${L[i].name}`);
+  const lastAp = state.content.ap[state.content.ap.length - 1], apOf = new Map(lastAp ? lastAp.ranks.map((id, i) => [id, i + 1]) : []);
   const teams = L.map((t) => {
     const r = c.teams[t.id], s = r.stats, tm = data.teams[t.id];
     return {
-      id: t.id, slug: t.slug, name: t.name, conf: tm.conf, tier: tm.tier,
+      id: t.id, slug: t.slug, name: t.name, ap: apOf.get(t.id) ?? null, conf: tm.conf, tier: tm.tier,
       gp: s.GP, w: s.W, l: s.L, cw: s.confW, cl: s.confL, home: s.home, away: s.away, neutral: s.neutral,
       pf: s.pfpg, pa: s.papg, margin: s.margin, oppRating: s.sos, sos: s.sos, rating: s.rating, tierRating: s.tierRating, eff: s.eff,
       rank: s.rank ?? 999, last10: s.last10 ?? "", streak: s.streak ?? "", bestWin: nm(s.bestWin), worstLoss: nm(s.worstLoss),
@@ -118,7 +119,13 @@ export const badge = (t, size) => {
   }
   return `<span class="badge t-${esc(t.tier)}"${style} aria-hidden="true">${esc(mono)}</span>`;
 };
-export const teamLink = (t) => `<a class="team-link" href="team.html?t=${t.slug}">${badge(t)}<span>${esc(t.name)}</span></a>`;
+/** the team's rank in the latest AP ballot as html ("#11") or nothing */
+export const apTag = (t) => (t && t.ap ? `<i class="ap-tag" title="AP rank">#${t.ap}</i> ` : "");
+/** plain-text name with the AP rank in front ("#11 Baylor") */
+export const apName = (t) => (t.ap ? `#${t.ap} ` : "") + t.name;
+/** a linked team; the latest AP rank rides along unless { ap: false } (history pages, past results, the AP table itself) */
+export const teamLink = (t, opts = {}) => `<a class="team-link" href="team.html?t=${t.slug}">${badge(t)}<span>${opts.ap === false ? "" : apTag(t)}${esc(t.name)}</span></a>`;
+export const teamLinkPlain = (t) => teamLink(t, { ap: false });
 export const teamHref = (t) => `team.html?t=${t.slug}`;
 
 export function roundOf(g) {

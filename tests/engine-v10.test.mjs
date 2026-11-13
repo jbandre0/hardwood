@@ -46,11 +46,13 @@ test("an average team's line is unchanged; a runaway team's line is pulled back 
   assert.ok(raw[9] > 44 && eff[9] < 43, `Alabama 3P% ${raw[9].toFixed(1)} -> ${eff[9].toFixed(1)}`);
   assert.ok(raw[8] > 85 && eff[8] < 84, `Alabama FT% ${raw[8].toFixed(1)} -> ${eff[8].toFixed(1)}`);
   const hot = L.map((t) => rawEngineRow(st10, c10, t.id)[9]); assert.ok(Math.max(...hot) > 50, "some team had a 50%+ three-point line");
-  assert.ok(Math.max(...L.map((t) => engineRow(st10, c10, t.id)[9])) < 44, "no team plays with more than 44% from three");
-  assert.ok(Math.min(...L.map((t) => engineRow(st10, c10, t.id)[9])) > 25, "or less than 25%");
+  assert.ok(Math.max(...L.map((t) => engineRow(st10, c10, t.id)[9])) < 40.75, "no team plays with more than ~4% past the real best three-point line (39.2%)");
+  assert.ok(Math.min(...L.map((t) => engineRow(st10, c10, t.id)[9])) > 28.3, "or ~4% below the real worst (29.6%)");
+  // a stat may pass the real best by 3% freely, but never by more than 4%
+  for (const [ix, pg, lo, hi] of V10.ENVELOPE) for (const t of L) { const r = engineRow(st10, c10, t.id), v = pg ? r[ix] / r[2] : r[ix]; assert.ok(v <= hi * 1.0401 + 1e-9 && v >= lo * 0.9599 - 1e-9, `stat ${ix} of ${t.name}: ${v}`); }
   // the style is kept: the order of the teams on a stat doesn't change except at the cap itself
   const a = L.map((t) => rawEngineRow(st10, c10, t.id)[9]), b = L.map((t) => engineRow(st10, c10, t.id)[9]);
-  for (let i = 0; i < 365; i += 7) for (let j = i + 1; j < 365; j += 11) if (Math.abs(a[i] - a[j]) > 1) assert.ok((a[i] - a[j]) * (b[i] - b[j]) > 0, "order kept");
+  for (let i = 0; i < 365; i += 7) for (let j = i + 1; j < 365; j += 11) if (Math.abs(a[i] - a[j]) > 1) assert.ok((a[i] - a[j]) * (b[i] - b[j]) >= 0, "the order of teams is never reversed (ties only at the limit)");
 });
 
 test("a team at the top of the ratings is about as strong as the best real team, not 46 points better than average", () => {
@@ -94,9 +96,7 @@ test("games are played and logged with the selected engine, and each logged game
     const g = nextUnplayed(st), r = rollGame(st, g.id, 4242); assert.equal(r.engine, want);
     record(st, g.id, r, {}); assert.equal(st.meta[g.id].engine, want);
   }
-  // ordinary games are identical in both engines (that is the point); a runaway team's game is not
-  const g = nextUnplayed(st10), x = rollGame(st10, g.id, 5), y = rollGame(st9, g.id, 5);
-  assert.deepEqual([x.ptsA, x.ptsB], [y.ptsA, y.ptsB], "an ordinary game plays the same in v9 and v10");
+  const g = nextUnplayed(st10);   // (most teams have at least one stat nudged by the 3-4% limit, so even ordinary games can differ a little)
   const top9 = V9.playRecordedGame(R9(best), R9(worst), "neutral", { seed: 5 }), top10 = V10.playRecordedGame(R10(best), R10(worst), "neutral", { seed: 5 });
   assert.ok(top9.ptsA - top9.ptsB > top10.ptsA - top10.ptsB, `best vs worst margin: v9 ${top9.ptsA - top9.ptsB}, v10 ${top10.ptsA - top10.ptsB}`);
   assert.equal(engineOf(st10), ENGINES.v10);

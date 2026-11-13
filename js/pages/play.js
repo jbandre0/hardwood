@@ -1,6 +1,6 @@
 import { shell, fail } from "../ui.js";
 import { combobox } from "../combobox.js";
-import { loadCore, resetCores, esc, badge, teamLink, signed } from "../data.js";
+import { loadCore, resetCores, esc, badge, teamLink, signed, apTag, apName } from "../data.js";
 import { engineVersion, rollAndRecord, rollGame, recordRolled, playDay, undoLast, toOverlay, nextUnplayed, calc, setContent, syncTournament } from "../league/league.js";
 import { computeBoard } from "../league/bracketology.js";
 import { suggestField, validateField } from "../league/field.js";
@@ -101,7 +101,7 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
           ${season.day >= 54 || complete ? `<div class="card"><div class="card-head"><h2>Offseason</h2></div><p class="muted" style="margin-top:0">Awards, the tier review and creating next season.</p><a class="btn" href="offseason.html">Open the offseason</a></div>` : ""}
           ${complete ? "" : `<div class="card" id="engineCard">
             <div class="card-head"><h2>Engine</h2><span class="muted">${engineVersion(state) === "v10" ? "v10, realism ceiling" : "v9, original"}</span></div>
-            <p class="muted" style="margin-top:0;font-size:.88rem">v10 plays like v9 but holds runaway teams to what a real team could do (rated 34 at most, no 50% three-point lines) and caps anyone's chance of beating anyone at 99%. Each logged game records which engine played it, and predictions are scored separately per engine.</p>
+            <p class="muted" style="margin-top:0;font-size:.88rem">v10 plays like v9 but holds runaway teams to what a real team could do (rated 34 at most, stats no more than ~4% past the best real team) and caps anyone's chance of beating anyone at 99%. Each logged game records which engine played it, and predictions are scored separately per engine.</p>
             <div class="seg" id="engineSeg" role="group" aria-label="Engine version"><button type="button" data-v="v10" class="${engineVersion(state) === "v10" ? "on" : ""}">v10</button><button type="button" data-v="v9" class="${engineVersion(state) === "v9" ? "on" : ""}">v9</button></div></div>`}
           ${complete ? "" : `<div class="card">
             <div class="card-head"><h2>Predictions</h2><a href="predictions.html">Scorecard</a></div>
@@ -304,14 +304,14 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
         const ctx = g.type === "NCAA" ? g.ctx : g.type === "CT" ? `${g.ctx} tournament` : g.type === "Conf" ? `${teams[g.a].conf} conference game` : "Non-conference";
         const played = !!r, aw = played && r.ptsA > r.ptsB;
         const side = (L, pts, win, isHost) => `<div class="gd-team ${played && win ? "win" : ""}">${badge(L.t, 40)}
-          <div><b>${esc(L.t.name)}${isHost ? ' <span class="faint" style="font-weight:500">(home)</span>' : ""}</b><span class="muted">${L.rec} &middot; ${L.conf} conf &middot; ${L.rank ? "#" + L.rank : "unranked"} &middot; rating ${L.rating.toFixed(1)}${L.streak ? " &middot; " + L.streak : ""}${L.form ? " &middot; last 10 " + L.form : ""}</span></div>
+          <div><b>${apTag(L.t)}${esc(L.t.name)}${isHost ? ' <span class="faint" style="font-weight:500">(home)</span>' : ""}</b><span class="muted">${L.rec} &middot; ${L.conf} conf &middot; ${L.rank ? "#" + L.rank : "unranked"} &middot; rating ${L.rating.toFixed(1)}${L.streak ? " &middot; " + L.streak : ""}${L.form ? " &middot; last 10 " + L.form : ""}</span></div>
           <span class="gd-pts">${played ? pts : ""}</span></div>`;
         const st = (k1, k2, bx) => `${bx[k1]}-${bx[k2]}`;
         box.innerHTML = `
-          <div class="card-head"><h2>Game ${g.id}</h2><span class="muted">Day ${g.day} &middot; ${esc(ctx)} &middot; ${g.home ? `at ${esc(teams[g.b].name)}` : "neutral site"}</span></div>
+          <div class="card-head"><h2>Game ${g.id}</h2><span class="muted">Day ${g.day} &middot; ${esc(ctx)} &middot; ${g.home ? `at ${esc(apName(teams[g.b]))}` : "neutral site"}</span></div>
           <div class="gd-score">${side(A, played && r.ptsA, aw, false)}${side(B, played && r.ptsB, !aw, g.home !== 0)}</div>
           ${played ? `<p class="muted" style="margin:10px 0 0;font-size:.88rem"><b class="${"up"}">Final${r.ot ? ` (${r.ot > 1 ? r.ot : ""}OT)` : ""}, logged to the season.</b> FG ${st("FGM", "FGA", r.boxA)} / ${st("FGM", "FGA", r.boxB)} &middot; 3P ${st("TPM", "TPA", r.boxA)} / ${st("TPM", "TPA", r.boxB)} &middot; FT ${st("FTM", "FTA", r.boxA)} / ${st("FTM", "FTA", r.boxB)} &middot; REB ${r.boxA.OR + r.boxA.DR} / ${r.boxB.OR + r.boxB.DR} &middot; TO ${r.boxA.TO} / ${r.boxB.TO}</p>` : ""}
-          ${pred ? `<p class="faint" style="margin:8px 0 0;font-size:.82rem">Prediction locked before tip-off (${pred.sims.toLocaleString()} sims, kept separate from the game): ${esc(teams[g.a].name)} ${pc(pred.pA)}, ${esc(teams[g.b].name)} ${pc(1 - pred.pA)}, expected margin ${pred.margin >= 0 ? "+" : ""}${pred.margin.toFixed(1)} for ${esc(teams[g.a].name)}. The game itself is one roll.</p>` : ""}
+          ${pred ? `<p class="faint" style="margin:8px 0 0;font-size:.82rem">Prediction locked before tip-off (${pred.sims.toLocaleString()} sims, kept separate from the game): ${esc(apName(teams[g.a]))} ${pc(pred.pA)}, ${esc(apName(teams[g.b]))} ${pc(1 - pred.pA)}, expected margin ${pred.margin >= 0 ? "+" : ""}${pred.margin.toFixed(1)} for ${esc(apName(teams[g.a]))}. The game itself is one roll.</p>` : ""}
           <div class="btn-row" style="margin-top:14px">
             ${played && dayDone(state, g.day) ? `<button class="btn warm" id="gdNext" type="button" title="Enter">Day ${g.day} is finished: see the recap</button>` : played ? `<button class="btn" id="gdNext" type="button" title="Enter">Load next game</button>` : `<button class="btn" id="gdPlay" type="button" title="Enter">Play game</button><button class="btn warm" id="gdWatch" type="button" title="W">Watch game</button>`}
             <span style="display:inline-flex;gap:6px;align-items:center"><input type="number" id="gdId" placeholder="Game #" style="width:110px" aria-label="Game number"><button class="btn ghost" id="gdLoad" type="button">Load</button></span>

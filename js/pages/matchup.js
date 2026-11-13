@@ -1,6 +1,6 @@
 import { shell, fail } from "../ui.js";
 import { combobox } from "../combobox.js";
-import { loadCore, esc, pct, signed, badge, byRank, teamHref } from "../data.js";
+import { loadCore, esc, pct, signed, badge, byRank, teamHref, apTag, apName } from "../data.js";
 import { ENGINES } from "../league/league.js";
 
 const VENUES = [["neutral", "Neutral court"], ["A_home", "Team A at home"], ["B_home", "Team B at home"]];
@@ -62,7 +62,7 @@ function histogram(h, nameA, nameB) {
 
     const teamOpts = ranked.map((t) => ({
       value: t.slug, label: t.name, search: `${t.name} ${t.conf} ${t.rank}`, lead: badge(t, 28),
-      html: `${badge(t, 26)}<span>${esc(t.name)}</span><span class="sub">${esc(t.conf)} &middot; #${t.rank}</span>`,
+      html: `${badge(t, 26)}<span>${apTag(t)}${esc(t.name)}</span><span class="sub">${esc(t.conf)} &middot; #${t.rank}</span>`,
     }));
     view.innerHTML = `
       <div class="page-title"><span class="kicker">Matchup simulator</span><h1>Tip it off</h1>
@@ -114,13 +114,13 @@ function histogram(h, nameA, nameB) {
       out.innerHTML = `
         <div class="card" style="margin-bottom:18px">
           <div class="matchup-head">
-            <div class="mh-team">${badge(A, 62)}<div><h2>${esc(A.name)}</h2><small>${esc(A.conf)} &middot; Tier ${esc(A.tier)} &middot; ${A.w}-${A.l}</small></div></div>
+            <div class="mh-team">${badge(A, 62)}<div><h2>${apTag(A)}${esc(A.name)}</h2><small>${esc(A.conf)} &middot; Tier ${esc(A.tier)} &middot; ${A.w}-${A.l}</small></div></div>
             <span class="pill">${esc(venueNote)}</span>
-            <div class="mh-team right">${badge(B, 62)}<div><h2>${esc(B.name)}</h2><small>${esc(B.conf)} &middot; Tier ${esc(B.tier)} &middot; ${B.w}-${B.l}</small></div></div>
+            <div class="mh-team right">${badge(B, 62)}<div><h2>${apTag(B)}${esc(B.name)}</h2><small>${esc(B.conf)} &middot; Tier ${esc(B.tier)} &middot; ${B.w}-${B.l}</small></div></div>
           </div>
           <div class="prob-row">
             <div class="prob-pct">${pct(pA)}</div>
-            <div class="prob-track" role="img" aria-label="${esc(A.name)} ${pct(pA)}, ${esc(B.name)} ${pct(pB)}"><i style="width:${(pA * 100).toFixed(1)}%"></i><i style="width:${(pB * 100).toFixed(1)}%"></i></div>
+            <div class="prob-track" role="img" aria-label="${esc(apName(A))} ${pct(pA)}, ${esc(apName(B))} ${pct(pB)}"><i style="width:${(pA * 100).toFixed(1)}%"></i><i style="width:${(pB * 100).toFixed(1)}%"></i></div>
             <div class="prob-pct" style="color:var(--warm)">${pct(pB)}</div>
           </div>
           <p class="muted" style="margin:14px 0 0"><b style="color:var(--text)">${esc(fav.name)}</b> wins ${pct(fp)} of the time, by an average of ${Math.abs(spread).toFixed(1)}.</p>
@@ -129,11 +129,11 @@ function histogram(h, nameA, nameB) {
           <div class="stack">
             <div class="card"><div class="kpis">
               <div class="kpi"><small>Projected score</small><b>${r.scoreA.toFixed(0)}-${r.scoreB.toFixed(0)}</b></div>
-              <div class="kpi"><small>Spread</small><b>${Math.abs(spread).toFixed(1)}</b><span>${esc(spread >= 0 ? A.name : B.name)}</span></div>
+              <div class="kpi"><small>Spread</small><b>${Math.abs(spread).toFixed(1)}</b><span>${esc(apName(spread >= 0 ? A : B))}</span></div>
               <div class="kpi"><small>Total points</small><b>${r.total.toFixed(1)}</b></div>
               <div class="kpi"><small>Margin SD</small><b>${r.sd.toFixed(1)}</b></div></div></div>
             <div class="card"><div class="card-head"><h3>Margin distribution</h3><span class="faint">${r.n.toLocaleString()} games</span></div>
-              ${histogram(r.hist, A.name, B.name)}</div>
+              ${histogram(r.hist, apName(A), apName(B))}</div>
           </div>
           <div class="card" id="play">
             <div class="card-head"><h3>Play one game</h3></div>
@@ -160,9 +160,9 @@ function histogram(h, nameA, nameB) {
       };
       gameEl.innerHTML = `
         <div class="scoreboard">
-          <div><div class="sb-team">${esc(A.name)}</div><div class="sb-pts" ${g.scoreA < g.scoreB ? 'style="color:var(--faint)"' : ""}>${g.scoreA}</div></div>
+          <div><div class="sb-team">${apTag(A)}${esc(A.name)}</div><div class="sb-pts" ${g.scoreA < g.scoreB ? 'style="color:var(--faint)"' : ""}>${g.scoreA}</div></div>
           <div class="sb-mid">FINAL${g.ot ? ` / ${g.ot > 1 ? g.ot : ""}OT` : ""}</div>
-          <div><div class="sb-team">${esc(B.name)}</div><div class="sb-pts" ${g.scoreB < g.scoreA ? 'style="color:var(--faint)"' : ""}>${g.scoreB}</div></div>
+          <div><div class="sb-team">${apTag(B)}${esc(B.name)}</div><div class="sb-pts" ${g.scoreB < g.scoreA ? 'style="color:var(--faint)"' : ""}>${g.scoreB}</div></div>
         </div>
         <p class="muted" style="margin:0 0 10px"><b style="color:var(--text)">${esc(win.name)}</b> wins by ${Math.abs(g.scoreA - g.scoreB)}.</p>
         <div class="seg" style="margin-bottom:10px"><button type="button" class="on" data-m="sc">Scoring plays</button><button type="button" data-m="all">Every possession</button></div>

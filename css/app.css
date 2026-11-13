@@ -401,3 +401,14 @@ tr.on-deck td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .game .tm.bad .nm { text-decoration: line-through; color: var(--down, #e07a7a); }
 .game .tm.truth .nm { color: var(--accent); font-weight: 700; }
 .game button.tm:disabled { opacity: 1; }
+/* AP rank tag in front of a team name (#11 Baylor) */
+.ap-tag { font-style: normal; font-weight: 800; font-size: .82em; color: var(--peach); margin-right: 1px; letter-spacing: .01em; }
+.mh-team h2 .ap-tag, .sb-team .ap-tag, .gd-team b .ap-tag, .wv-team b .ap-tag { font-size: .62em; vertical-align: .18em; margin-right: 6px; }
+/* Bracketology: movement since last week */
+.mv { font-weight: 800; font-size: .76rem; white-space: nowrap; }
+.mv.up { color: var(--mint, #6FCF97); } .mv.down { color: #e07a7a; } .mv.new, .mv.in { color: var(--peach, #FFD6A5); } .mv.out { color: #e07a7a; } .mv.same { color: var(--faint); font-weight: 500; }
+.game .tm .pts .mv { font-size: .66rem; letter-spacing: -.02em; }
+.game .tm.aq { box-shadow: inset 2px 0 0 var(--peach, #FFD6A5); }
+.chg-h { font: 700 .8rem var(--body); text-transform: uppercase; letter-spacing: .05em; margin: 0 0 6px; color: var(--muted); }
+.chg-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: .9rem; }
+.bk-team { grid-template-columns: 26px 1fr auto auto; }

@@ -73,7 +73,7 @@ import { saveOverlay } from "../league/store.js";
         <div class="poll-tabs" role="tablist" aria-label="Poll week">${P.map((x, i) => `<button type="button" role="tab" class="${i === week ? "on" : ""}" data-i="${i}">${x.week === 0 ? "Pre" : "Wk " + x.week}</button>`).join("")}</div>
         <div class="table-wrap"><table><thead><tr><th class="c">#</th><th>Team</th><th>Conf</th><th class="r">Record</th><th class="c">Move</th><th class="r">Rating</th></tr></thead><tbody>
           ${p.ranks.map((id, i) => { const t = core.teams[id], r = i + 1;
-            return `<tr><td class="rank c">${r}</td><td>${teamLink(t)}</td><td class="muted">${esc(t.conf)}</td><td class="r num">${recordAsOf(core, id, p.afterDay)}</td><td class="c">${rankMove(prevRank, id, r)}</td><td class="r num"><b>${t.rating.toFixed(1)}</b></td></tr>`;
+            return `<tr><td class="rank c">${r}</td><td>${teamLink(t, { ap: false })}</td><td class="muted">${esc(t.conf)}</td><td class="r num">${recordAsOf(core, id, p.afterDay)}</td><td class="c">${rankMove(prevRank, id, r)}</td><td class="r num"><b>${t.rating.toFixed(1)}</b></td></tr>`;
           }).join("")}
         </tbody></table></div>
         ${dropped.length ? `<p class="muted" style="margin:12px 0 0;font-size:.88rem">Dropped out: ${dropped.map((id) => esc(core.teams[id].name)).join(", ")}</p>` : ""}
@@ -143,7 +143,7 @@ import { saveOverlay } from "../league/store.js";
         <div class="card-head"><h2>Power Poll &middot; ${p.week === 0 ? "Preseason" : "Week " + p.week}</h2><span class="muted">top 25 power ratings after day ${p.afterDay}</span></div>
         <div class="poll-tabs" role="tablist" aria-label="Snapshot week">${P.map((x, i) => `<button type="button" role="tab" class="${i === pweek ? "on" : ""}" data-i="${i}">${x.week === 0 ? "Pre" : "Wk " + x.week}</button>`).join("")}</div>
         <div class="table-wrap"><table><thead><tr><th class="c">#</th><th>Team</th><th>Conf</th><th class="r">Record then</th><th class="c">Move</th><th class="r">Rating then</th><th class="r">Now</th></tr></thead><tbody>
-          ${p.ranks.map((id, i) => { const t = core.teams[id]; return `<tr><td class="rank c">${i + 1}</td><td>${teamLink(t)}</td><td class="muted">${esc(t.conf)}</td><td class="r num">${recordAsOf(core, id, p.afterDay)}</td><td class="c">${rankMove(prevRank, id, i + 1)}</td><td class="r num">${p.ratings ? `<b>${p.ratings[i].toFixed(1)}</b>` : "—"}</td><td class="r num muted">${t.rating.toFixed(1)}</td></tr>`; }).join("")}
+          ${p.ranks.map((id, i) => { const t = core.teams[id]; return `<tr><td class="rank c">${i + 1}</td><td>${teamLink(t, { ap: false })}</td><td class="muted">${esc(t.conf)}</td><td class="r num">${recordAsOf(core, id, p.afterDay)}</td><td class="c">${rankMove(prevRank, id, i + 1)}</td><td class="r num">${p.ratings ? `<b>${p.ratings[i].toFixed(1)}</b>` : "—"}</td><td class="r num muted">${t.rating.toFixed(1)}</td></tr>`; }).join("")}
         </tbody></table></div>
         ${season.status !== "complete" ? `<div class="btn-row" style="margin-top:14px"><button class="btn ghost" id="snap" type="button">Snapshot now (after day ${season.day})</button></div>` : ""}`;
       panel.querySelectorAll(".poll-tabs button").forEach((b) => b.onclick = () => { pweek = +b.dataset.i; poll(); });

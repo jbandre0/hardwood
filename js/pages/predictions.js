@@ -1,5 +1,5 @@
 import { shell, fail } from "../ui.js";
-import { loadCore, esc, teamLink } from "../data.js";
+import { loadCore, esc, teamLinkPlain as teamLink } from "../data.js";
 import { scorecard, BACKTEST } from "../league/predictions.js";
 
 const f3 = (x) => x.toFixed(3), p0 = (x) => `${(x * 100).toFixed(0)}%`, p1 = (x) => `${(x * 100).toFixed(1)}%`, sg = (x) => (x >= 0 ? "+" : "-") + Math.abs(x).toFixed(1);

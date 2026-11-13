@@ -1,6 +1,6 @@
 import { shell, fail } from "../ui.js";
 import { combobox } from "../combobox.js";
-import { loadCore, esc, teamLink, signed } from "../data.js";
+import { loadCore, esc, teamLinkPlain as teamLink, signed } from "../data.js";
 import { confStandings, conferencePower } from "../league/standings.js";
 import { nextUnplayed } from "../league/league.js";
 

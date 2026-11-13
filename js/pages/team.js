@@ -38,7 +38,7 @@ const IX = Object.fromEntries(ENG.map((n, i) => [n, i]));
     view.innerHTML = `
       <div class="team-hero">
         ${badge(t, 92)}
-        <div><span class="kicker">${esc(t.conf)} &middot; Tier ${esc(t.tier)} &middot; ${esc(season.label)}</span><h1>${esc(t.name)}</h1>
+        <div><span class="kicker">${esc(t.conf)} &middot; Tier ${esc(t.tier)} &middot; ${esc(season.label)}</span><h1>${esc(t.name)}</h1>${t.ap ? `<span class="pill mint" style="margin-top:6px">AP #${t.ap}</span>` : ""}
           <p class="muted" style="margin:10px 0 0">${t.w}-${t.l} overall &middot; ${t.cw}-${t.cl} in conference${t.gp ? ` &middot; ranked #${t.rank} in the power ratings` : ""}${post ? ` &middot; ${post.seed}-seed in the NCAA Tournament${finish ? ` (${esc(finish)})` : ""}` : ""}</p></div>
         <div class="rating-big"><b>${t.gp ? t.rating.toFixed(1) : "—"}</b><small>Rating</small></div>
       </div>
@@ -58,7 +58,7 @@ const IX = Object.fromEntries(ENG.map((n, i) => [n, i]));
             <div class="table-wrap"><table><thead><tr><th>Day</th><th>Type</th><th></th><th>Opponent</th><th class="c">Tier</th><th class="c">Result</th><th class="r">Score</th><th class="r">Record</th><th class="r">Margin</th></tr></thead><tbody>
               ${sch.map((s) => { const o = teams[s.opp]; const sd = core.seed.get(s.opp);
                 if (s.played) { s.won ? rw++ : rl++; }
-                return `<tr${s.played ? "" : ' class="upcoming"'}><td class="muted num">${s.g.day}</td><td class="muted">${esc(roundOf(s.g).replace("Non-conference", "Non-conf").replace("Conference Tournament", "Conf tourney"))}</td><td class="faint">${s.venue}</td><td>${teamLink(o)} <span class="faint num" style="font-size:.8rem">#${o.rank}${apRank.has(s.opp) ? ` &middot; AP ${apRank.get(s.opp)}` : ""}${sd && s.g.type === "NCAA" ? ` &middot; ${sd.seed}-seed` : ""}</span></td><td class="c"><span class="pill">${esc(o.tier)}</span></td>
+                return `<tr${s.played ? "" : ' class="upcoming"'}><td class="muted num">${s.g.day}</td><td class="muted">${esc(roundOf(s.g).replace("Non-conference", "Non-conf").replace("Conference Tournament", "Conf tourney"))}</td><td class="faint">${s.venue}</td><td>${teamLink(o)} <span class="faint num" style="font-size:.8rem">#${o.rank}${sd && s.g.type === "NCAA" ? ` &middot; ${sd.seed}-seed` : ""}</span></td><td class="c"><span class="pill">${esc(o.tier)}</span></td>
                   <td class="c">${s.played ? `<span class="res ${s.won ? "W" : "L"}" style="display:inline-grid;place-items:center;width:26px;height:26px;border-radius:4px;font:800 .85rem var(--display)">${s.won ? "W" : "L"}</span>` : `<span class="faint">—</span>`}</td>
                   <td class="r num">${s.played ? `${s.us}-${s.them}` : `<span class="faint">upcoming</span>`}</td><td class="r num muted">${s.played ? `${rw}-${rl}` : ""}</td><td class="r num ${s.played ? (s.us > s.them ? "up" : "down") : ""}">${s.played ? signed(s.us - s.them, 0) : ""}</td></tr>`; }).join("")}
             </tbody></table></div>

@@ -11,8 +11,9 @@
 //     team was -28.7). The team's whole line is scaled toward the league-average line by the same factor, so its style
 //     (shooting vs rebounding vs turnovers) is kept and only the size of its edge is limited. Teams between -24 and 26,
 //     which is nearly everyone, play exactly as in v9 on this step.
-//  2. SINGLE-STAT CEILING. Each stat is soft-limited to about 1.5 standard deviations beyond the best and worst
-//     any real team had in any tier (the Tier Setup ranges), so nobody shoots 50% from three or turns it over 6 times a game.
+//  2. SINGLE-STAT CEILING. Each stat is soft-limited to just past the best and worst any real team had in any tier (the Tier
+//     Setup ranges): a stat may go 3% beyond the real best (or worst) freely and is squeezed toward 4% beyond it, so a team can
+//     exceed what was ever achieved but not excessively, and nobody shoots 50% from three or turns it over 6 times a game.
 //  3. WIN-PROBABILITY CEILING. In 2% of games ("chaos") both teams play as one equal team on a neutral floor, a freak night
 //     where the favorite's edge disappears. That caps any team's chance against any other team at about 99%
 //     (98% x 100% + 2% x 50%) and shaves a little off every favorite.
@@ -24,6 +25,7 @@ import { playRecordedGame as playRecordedGame9, predict as predict9, playGame as
 export const VERSION = "v10";
 export const CHAOS = 0.02;
 export const STRENGTH = { hiKnee: 26, hiMax: 34, loKnee: -24, loMax: -31 };
+export const STAT_ROOM = { free: 0.03, max: 0.04 };   // beyond the real-life best/worst, as a share of that value
 
 /** compressed rating: unchanged between loKnee and hiKnee, then a smooth approach to hiMax / loMax */
 export function cappedRating(R, s = STRENGTH) {
@@ -57,7 +59,11 @@ export const ENVELOPE = [
   [25, 0, 0.3236, 0.3852, 0.0485], // FTA/FGA (TR)
 ];
 const SCALED = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 22, 23, 24, 25];   // every numeric input except Games(2), STR*Ra(16), HFA(17)
-const soft = (x, lo, hi, w) => (x > hi ? hi + w * Math.tanh((x - hi) / w) : x < lo ? lo - w * Math.tanh((lo - x) / w) : x);
+/** soft limit: untouched up to 3% past the real-life extreme, then squeezed so it can never pass 4% past it */
+function statLimit(x, lo, hi) {
+  const { free, max } = STAT_ROOM, kHi = hi * (1 + free), wHi = hi * (max - free), kLo = lo * (1 - free), wLo = lo * (max - free);
+  return x > kHi ? kHi + wHi * Math.tanh((x - kHi) / wHi) : x < kLo ? kLo - wLo * Math.tanh((kLo - x) / wLo) : x;
+}
 
 /**
  * Steps 1 and 2 for one team: `row` is the raw 26-column engine row, `rating` the team's SRS rating, `mean` the league-average
@@ -67,10 +73,7 @@ export function ceilingRow(row, rating, mean) {
   const r = row.slice(), R = rating || 0, target = cappedRating(R), f = R !== 0 && target !== R ? target / R : 1;
   if (f !== 1) for (const i of SCALED) r[i] = mean[i - 2] + f * (row[i] - mean[i - 2]);
   const G = r[2];
-  for (const [ix, perGame, lo, hi, sd] of ENVELOPE) {
-    const w = 0.5 * sd, bHi = hi + sd, bLo = lo - sd;                  // limits start one residual SD beyond the real best/worst
-    r[ix] = perGame ? soft(r[ix] / G, bLo, bHi, w) * G : soft(r[ix], bLo, bHi, w);
-  }
+  for (const [ix, perGame, lo, hi] of ENVELOPE) r[ix] = perGame ? statLimit(r[ix] / G, lo, hi) * G : statLimit(r[ix], lo, hi);
   r[4] = (r[10] + r[11]) / G;       // REB is OR + DR per game
   return r;
 }

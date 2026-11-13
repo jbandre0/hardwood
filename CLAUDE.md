@@ -45,6 +45,7 @@ Full local setup and troubleshooting: `docs/LOCAL-SESSION.md`.
 - `js/league/*.js` league logic (schedule, stats, standings, tournaments, bracketology Board, insights, offseason, history, predictions, leaders, challenge, watch); `js/engine.js` the v9 engine, `js/engine-v10.js` v10 (ceiling); `js/pages/*.js` one file per page; `*.html` the pages.
 - `data/league.json` teams; `data/seasons/<id>/*.json` per-season baseline; `data/editions.json`, `data/challenge.json`, `data/backups/latest.json` published content.
 - `tools/` importer (`import_workbook.py`), publishers, brief generator, test fixtures. `tests/` unit tests (`node --test tests/*.test.mjs`) and browser tests (`tests/e2e/*.cjs`).
+- After editing `css/app.css` run `node tools/stamp_css.mjs` (cache-busting stamp on every page; a unit test checks it).
 - `README.md` has the season loop, data layout and test commands.
 
 ## Useful commands

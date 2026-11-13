@@ -15,7 +15,7 @@ STYLE = f"{GF}\n<style>\n{css}\n</style>"
 pages = ["about", "bracket", "matchup", "rankings", "standings", "team"]
 for p in pages:
     h = open(os.path.join(root, p + ".html")).read()
-    h = re.sub(r'<link rel="stylesheet" href="css/fonts.css">\s*<link rel="stylesheet" href="css/app.css">', lambda m: STYLE, h)
+    h = re.sub(r'<link rel="stylesheet" href="css/fonts.css">\s*<link rel="stylesheet" href="css/app.css(?:\?v=[0-9a-f]+)?">', lambda m: STYLE, h)
     assert "<style>" in h, p
     open(os.path.join(out, p + ".html"), "w").write(h)
 entry = f"""<title>Hardwood Sim</title>

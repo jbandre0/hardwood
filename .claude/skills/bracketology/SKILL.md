@@ -17,7 +17,10 @@ have a reason, and say so.
 ## 0. Get the data
 
 The season lives in the commissioner's browser, so you need their export:
-- They attach `hardwood-<season>-through-day-<N>.json` (Commissioner desk or Bracketology page, "Export for bracketology").
+- Run `git pull` first (local sessions), then `node tools/latest_export.mjs`: it finds the newest
+  `hardwood-<season>-through-day-<N>.json` in `exports/`, Downloads or Desktop. In a cloud session the commissioner attaches it instead.
+- Compare it to what is already published: if `throughDay` is not past the last edition's `afterDay` (`lastEdition` in the export),
+  there is nothing new to write about. Say so and ask them to play more days and export again.
 - No file? Ask for it in one line. Don't guess and don't work from the repo's baseline data: it stops where Excel stopped (Season 2, day 15).
 - Copy it into the scratchpad. It contains the whole season so far: every result, standings, team lines (record,
   conference record, rating, rank, SOS, Q1/Q2 wins, bad losses, last 10, streak, Board score, and each team as of the
@@ -95,13 +98,14 @@ Fix every error it lists and re-run until it says OK. Then publish for real (dro
 the commissioner asked to redo a week). Then check the page renders:
 ```bash
 node --test tests/editions.test.mjs
+# optional, needs Playwright and a local server (skip it if they aren't installed):
 python3 -m http.server 8000 &   # then: node tests/e2e/smoke.cjs
 ```
 Save the commissioner's backup (the export carries everything saved in their browser) so it survives off-browser:
 ```bash
 node tools/save_backup.mjs <export.json>
 ```
-Commit `data/editions.json` and `data/backups/latest.json` together with a message like `Bracketology: Season 2 week 5`
+Commit `data/editions.json` and `data/backups/latest.json` (and `data/challenge.json` when you filed one) together with a message like `Bracketology: Season 2 week 5`
 and push to `main` (the site deploys from `main` in about a minute). Retry pushes on network errors. If the export has
 no backup inside (an old export), publish anyway and tell the commissioner the backup step was skipped.
 

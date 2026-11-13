@@ -405,6 +405,7 @@ tr.on-deck td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .game button.tm:disabled { opacity: 1; }
 /* AP rank tag in front of a team name (#11 Baylor) */
 .ap-tag { font-style: normal; font-weight: 800; font-size: .82em; color: var(--peach); margin-right: 1px; letter-spacing: .01em; }
+:root[data-theme="light"] .ap-tag { color: #1f6b4e; }   /* dark green: the peach tag is unreadable on cream */
 .mh-team h2 .ap-tag, .sb-team .ap-tag, .gd-team b .ap-tag, .wv-team b .ap-tag { font-size: .62em; vertical-align: .18em; margin-right: 6px; }
 /* Bracketology: movement since last week */
 .mv { font-weight: 800; font-size: .76rem; white-space: nowrap; }

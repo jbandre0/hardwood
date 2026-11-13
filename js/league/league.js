@@ -1,7 +1,8 @@
 // League state for one season: baseline data (static JSON) + changes saved in the browser, with game rolling, recording,
 // playing a day and undo. Works in the browser and in Node (tests): data comes in through a loader function.
 import { tournamentSeeds, regularSeasonLines, ctSchedule, ctGameId, ncaaGames } from "./tournament.js";
-import { playRecordedGame } from "../engine.js";
+import * as E9 from "../engine.js";
+import * as E10 from "../engine-v10.js";
 import { computeSeason, ENG } from "./stats.js";
 
 export const FILES = ["teams", "games", "box", "settings", "marquee", "polls", "bracketology", "offseason", "meta", "archive", "ncaa"];
@@ -103,9 +104,24 @@ export const playedCount = (state) => state.games.filter((g) => g.ptsA != null).
 export const lastPlayedDay = (state) => state.games.reduce((m, g) => (g.ptsA != null && g.day > m ? g.day : m), 0);
 export const gamesOnDay = (state, day) => state.games.filter((g) => g.day === day);
 
-/** engine input row for a team from the current Sim Live line */
+// ---- engine versions: v9 is the original, v10 adds the realism ceiling (js/engine-v10.js). v10 is the default; the commissioner can switch.
+export const ENGINES = { v9: E9, v10: E10 };
+export const DEFAULT_ENGINE = "v10";
+export const engineVersion = (state) => (state.content && ENGINES[state.content.engine] ? state.content.engine : DEFAULT_ENGINE);
+export const engineOf = (state) => ENGINES[engineVersion(state)];
+/** the league-average 24-column line (cached on the calc result, which is rebuilt whenever a game is recorded) */
+export function meanLine(c) {
+  if (!c._mean) { const T = c.teams, m = new Array(T[0].live.length).fill(0); for (const t of T) t.live.forEach((v, i) => { m[i] += v / T.length; }); c._mean = m; }
+  return c._mean;
+}
+/** the raw 26-column engine row (name, conference, current Sim Live line), no ceiling */
+export const rawEngineRow = (state, c, id) => [state.data.league[id].name, state.data.teams[id].conf, ...c.teams[id].live];
+/** engine input row for a team: the Sim Live line, held to the realism ceiling when the v10 engine is on */
 export function engineRow(state, c, id) {
-  return [state.data.league[id].name, state.data.teams[id].conf, ...c.teams[id].live];
+  const row = rawEngineRow(state, c, id);
+  if (engineVersion(state) !== "v10") return row;
+  const s = c.teams[id].stats;
+  return E10.ceilingRow(row, s.GP ? s.rating : 0, meanLine(c));
 }
 export const venueOf = (g) => (g.home === 0 ? "neutral" : "B_home");
 
@@ -115,7 +131,8 @@ export function rollGame(state, gameId, seed, c = calc(state), { keepLog = false
   if (!g) throw new Error(`Game ${gameId} is not on the schedule`);
   if (g.ptsA != null) throw new Error(`Game ${gameId} is already recorded`);
   if (g.a == null || g.b == null) throw new Error(`Game ${gameId} has no teams yet`);
-  return playRecordedGame(engineRow(state, c, g.a), engineRow(state, c, g.b), venueOf(g), { seed, keepLog });
+  const r = engineOf(state).playRecordedGame(engineRow(state, c, g.a), engineRow(state, c, g.b), venueOf(g), { seed, keepLog });
+  return { ...r, engine: r.engine || "v9" };
 }
 
 const boxRow = (id, r) => [id, r.ot, ...["FGM", "FGA", "TPM", "TPA", "FTM", "FTA", "OR", "DR", "TO", "ST", "POSS"].map((k) => r.boxA[k]),
@@ -128,7 +145,7 @@ export function record(state, gameId, result, meta = {}) {
   if (result.ptsA === result.ptsB) throw new Error("tied score");
   g.ptsA = result.ptsA; g.ptsB = result.ptsB;
   state.box.set(gameId, boxRow(gameId, result));
-  state.recorded.push(gameId); state.meta[gameId] = { seed: result.seed, at: meta.at || new Date().toISOString(), ...meta };
+  state.recorded.push(gameId); state.meta[gameId] = { seed: result.seed, at: meta.at || new Date().toISOString(), engine: result.engine || "v9", ...(result.chaos ? { chaos: true } : {}), ...meta };
   state.cache = null;
   return g;
 }

@@ -1,6 +1,6 @@
 // Data loading + derived structures shared by every page.
 
-import { loadSeasonData, createState, calc, lastPlayedDay, playedCount } from "./league/league.js";
+import { loadSeasonData, createState, calc, lastPlayedDay, playedCount, engineRow, engineVersion } from "./league/league.js";
 import { loadOverlay, seasonMeta, loadLocalSeason } from "./league/store.js";
 
 const cache = new Map();
@@ -77,7 +77,7 @@ async function buildCore(seasonId) {
       gp: s.GP, w: s.W, l: s.L, cw: s.confW, cl: s.confL, home: s.home, away: s.away, neutral: s.neutral,
       pf: s.pfpg, pa: s.papg, margin: s.margin, oppRating: s.sos, sos: s.sos, rating: s.rating, tierRating: s.tierRating, eff: s.eff,
       rank: s.rank ?? 999, last10: s.last10 ?? "", streak: s.streak ?? "", bestWin: nm(s.bestWin), worstLoss: nm(s.worstLoss),
-      eng: [t.name, tm.conf, ...r.live], start: tm.start, final: tm.final || null, prevRating: tm.prevRating ?? null,
+      eng: [t.name, tm.conf, ...r.live], effEng: engineRow(state, c, t.id), start: tm.start, final: tm.final || null, prevRating: tm.prevRating ?? null,
     };
   });
   const bySlug = new Map(teams.map((t) => [t.slug, t]));
@@ -93,7 +93,7 @@ async function buildCore(seasonId) {
   const season = { id, label: info ? info.label : id, status: info ? info.status : "complete", day: lastPlayedDay(state), played: playedCount(state), total: state.games.length, regularSeasonDays: 42 };
   const meta = { ...(data.meta || {}), version: (data.meta && data.meta.version) || "v9" };
   const polls = state.content.ap;
-  return { season, teams, bySlug, games, teamGames, meta, ncaa, polls, seed, confs, state, calc: c, data, overlay, league: L };
+  return { season, teams, bySlug, games, teamGames, meta, ncaa, polls, seed, confs, state, calc: c, data, overlay, league: L, engine: engineVersion(state) };
 }
 
 // ---------- formatting ----------

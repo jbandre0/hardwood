@@ -1,8 +1,9 @@
 # Hardwood Sim: project notes for Claude
 
 The commissioner runs a fantasy college basketball league (365 D-I teams, 31 conferences) on this static website.
-Live site: GitHub Pages for this repo (deploys from `main` in about a minute). The simulation engine is v9 (possession by
-possession Monte Carlo) and is **frozen**: any engine change is a new version and needs the commissioner's say-so.
+Live site: GitHub Pages for this repo (deploys from `main` in about a minute). The simulation engine is possession by
+possession Monte Carlo. v9 (`js/engine.js`) is **frozen**; v10 (`js/engine-v10.js`, the default since the commissioner asked for a realism ceiling) wraps it
+with a strength cap, a single-stat cap and a 99% win-probability cap. Any further engine change is a new version and needs the commissioner's say-so.
 
 ## The one thing to know about data
 Everything the commissioner does on the site (games played, ballots, predictions, offseason choices, seasons created) is saved
@@ -35,7 +36,7 @@ Full local setup and troubleshooting: `docs/LOCAL-SESSION.md`.
 - The commissioner likes brutal honesty, humour, no cheesiness. Articles are in the voice of "Bracketology HQ".
 
 ## Repo map
-- `js/league/*.js` league logic (schedule, stats, standings, tournaments, bracketology Board, insights, offseason, history, predictions, leaders, challenge, watch); `js/engine.js` the v9 engine; `js/pages/*.js` one file per page; `*.html` the pages.
+- `js/league/*.js` league logic (schedule, stats, standings, tournaments, bracketology Board, insights, offseason, history, predictions, leaders, challenge, watch); `js/engine.js` the v9 engine, `js/engine-v10.js` v10 (ceiling); `js/pages/*.js` one file per page; `*.html` the pages.
 - `data/league.json` teams; `data/seasons/<id>/*.json` per-season baseline; `data/editions.json`, `data/challenge.json`, `data/backups/latest.json` published content.
 - `tools/` importer (`import_workbook.py`), publishers, brief generator, test fixtures. `tests/` unit tests (`node --test tests/*.test.mjs`) and browser tests (`tests/e2e/*.cjs`).
 - `README.md` has the season loop, data layout and test commands.

@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readJSON, season } from "./util.mjs";
-import { loadSeasonData, createState, calc, playDay, nextUnplayed } from "../js/league/league.js";
+import { loadSeasonData, createState, calc, playDay, nextUnplayed, meanLine } from "../js/league/league.js";
+import { ceilingRow } from "../js/engine-v10.js";
 import { tierStats, seasonStart } from "../js/league/stats.js";
 import { seasonSummary } from "../js/league/summary.js";
 import { tierReview, seasonAwards } from "../js/league/offseason.js";
@@ -30,7 +31,8 @@ test("Season 3 is built: new tiers applied, 40/60 starting lines, valid schedule
   for (const r of review) {
     const t = T[r.team], L = data.league[r.team];
     assert.equal(t.tier, r.final);
-    assert.deepEqual(t.start, seasonStart(tierStats(r.final, L.seed, data.settings), c.teams[r.team].live, 0.4));
+    const pc = c.teams[r.team], capped = ceilingRow(["", "", ...pc.live], pc.stats.GP ? pc.stats.rating : 0, meanLine(c)).slice(2);   // v10: the capped line the team played with carries over
+    assert.deepEqual(t.start, seasonStart(tierStats(r.final, L.seed, data.settings), capped, 0.4));
   }
   assert.equal(next.files.games.rows.length, 5475);
   const s3 = createState({ ...next.files, id: "season-3", league: data.league, archive: null, offseason: null, ncaa: null });

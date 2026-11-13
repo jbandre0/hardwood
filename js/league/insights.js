@@ -5,8 +5,8 @@
 //    toward tier, plus uncertainty that fades with games played), then each remaining game's margin ~ Normal(strength
 //    gap + home edge, 13.5), the engine's own margin spread. Fast enough to run thousands of seasons.
 import { computeSeason } from "./stats.js";
-import { makeRng, predict } from "../engine.js";
-import { engineRow } from "./league.js";
+import { makeRng } from "../engine.js";
+import { engineRow, engineOf } from "./league.js";
 
 export const POWER_CONFS = ["ACC", "Big 10", "Big 12", "SEC", "Big East"];
 export const QUICK_SD = 13.5;
@@ -126,7 +126,7 @@ export function weeklyInsights(state, c, { from, to, sims = 2000, seed = 1, what
     if (top.length >= 2 && !pairs.some((p) => p[1] === top[0] && p[2] === top[1])) pairs.push(["The top two power ratings, neutral floor", top[0], top[1]]);
     if (out.overachievers[0] && top[0] !== out.overachievers[0].id) pairs.push([`${out.overachievers[0].name} (Tier ${out.overachievers[0].tier}) against the No. 1 team`, out.overachievers[0].id, top[0]]);
     for (const [label, a, b] of pairs.slice(0, 3)) {
-      const r = predict(engineRow(state, c, a), engineRow(state, c, b), "neutral", { n: engineSims, seed: 1000 + a * 7 + b, hist: false });
+      const r = engineOf(state).predict(engineRow(state, c, a), engineRow(state, c, b), "neutral", { n: engineSims, seed: 1000 + a * 7 + b, hist: false });
       out.whatIfs.push({ label, a, b, aName: name(a), bName: name(b), pA: r.p, margin: r.margin, scoreA: r.scoreA, scoreB: r.scoreB, sims: engineSims });
     }
   }

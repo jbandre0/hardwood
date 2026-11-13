@@ -84,7 +84,7 @@ export function buildBroadcast(r, names, expMargin = 0) {
       if (runSide === e.side) runPts += e.pts; else { runSide = e.side; runPts = e.pts; runStart = e.t; }
       if (runPts > bestRun[e.side].pts) bestRun[e.side] = { pts: runPts, start: runStart, end: endClock ?? e.t, idx: i };
     }
-    const wp = winProb(diff, endClock ?? 0, expMargin);
+    const wp = endClock == null ? (diff > 0 ? 1 : 0) : winProb(diff, endClock, expMargin);   // after the last possession the game is over
     events.push({ i, t: e.t, endClock, label: clockLabel(e.t), side: e.side, code: e.code, kind, pts: e.pts, a: e.a, b: e.b, diff, text: text.replaceAll("{o}", o).replaceAll("{d}", d), wp,
       three: [7, 11, 12, 22, 25].includes(e.code), runNow: runSide === e.side ? runPts : 0, big: e.pts >= 3 || (e.pts && Math.abs(diff) <= 3 && (e.t < 150)) });
     pa = e.a; pb = e.b;

@@ -115,6 +115,7 @@ export function fail(view, err) {
 }
 
 async function wireSeasons() {
+  loadCore().then((c) => { const f = document.querySelector(".rail-foot"); if (f) f.innerHTML = `Engine ${c.engine} &middot; 40,000 sims per matchup`; }).catch(() => {});
   const box = document.getElementById("seasonPick");
   if (!box) return;
   try {

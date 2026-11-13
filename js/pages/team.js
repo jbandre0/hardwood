@@ -31,7 +31,8 @@ const IX = Object.fromEntries(ENG.map((n, i) => [n, i]));
     const games0 = t.start[IX["Games"]];
     const perGame = (arr, name) => (["OR", "DR"].includes(name) ? arr[IX[name]] / games0 : arr[IX[name]]);
     const stats = [["PPG", "Points / game"], ["3P%", "3P%"], ["2P%", "2P%"], ["FT%", "FT%"], ["TO", "Turnovers"], ["ST", "Steals"], ["OR", "Off. rebounds"], ["DR", "Def. rebounds"]];
-    const live = t.eng.slice(2); // [Games, PPG, ...]
+    const live = t.effEng.slice(2); // [Games, PPG, ...]: the line the engine actually plays with (after the v10 ceiling, if on)
+    const ceilinged = t.effEng.some((v, i) => typeof v === "number" && Math.abs(v - t.eng[i]) > 1e-6 * Math.max(1, Math.abs(v)));
     let rw = 0, rl = 0;
 
     view.innerHTML = `
@@ -74,7 +75,7 @@ const IX = Object.fromEntries(ENG.map((n, i) => [n, i]));
             <table><thead><tr><th></th><th class="r">Start</th><th class="r">Now</th><th class="r">Change</th></tr></thead><tbody>
               ${stats.map(([k, label]) => { const a = perGame(t.start, k), b = perGame(live, k), d = b - a; const good = k === "TO" ? d < 0 : d > 0; return `<tr><td class="muted">${label}</td><td class="r num">${a.toFixed(1)}</td><td class="r num"><b>${b.toFixed(1)}</b></td><td class="r num ${Math.abs(d) < 0.05 ? "muted" : good ? "up" : "down"}">${signed(d)}</td></tr>`; }).join("")}
             </tbody></table>
-            <p class="faint" style="margin:10px 0 0;font-size:.8rem">The engine plays this team with ${(w * 100).toFixed(0)}% of its own results and ${(100 - w * 100).toFixed(0)}% of its season-start line (fully its own after ${S.ramp} games). Starting tier rating ${t.tierRating.toFixed(1)}.</p></div>
+            <p class="faint" style="margin:10px 0 0;font-size:.8rem">The engine plays this team with ${(w * 100).toFixed(0)}% of its own results and ${(100 - w * 100).toFixed(0)}% of its season-start line (fully its own after ${S.ramp} games). Starting tier rating ${t.tierRating.toFixed(1)}.${ceilinged ? ` The v10 realism ceiling is holding this team's line back: its results say it is better (or worse) than any real team has been, so the engine plays it at the best (or worst) level a real team reached. The numbers above are the capped line.` : ""}</p></div>
         </div>
       </div>`;
     loadAllSeasons().then((seasons) => {

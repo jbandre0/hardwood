@@ -1,7 +1,7 @@
 import { shell, fail } from "../ui.js";
 import { combobox } from "../combobox.js";
 import { loadCore, esc, pct, signed, badge, byRank, teamHref } from "../data.js";
-import { playGame } from "../engine.js";
+import { ENGINES } from "../league/league.js";
 
 const VENUES = [["neutral", "Neutral court"], ["A_home", "Team A at home"], ["B_home", "Team B at home"]];
 
@@ -95,9 +95,8 @@ function histogram(h, nameA, nameB) {
     if (worker) worker.onmessage = (e) => { const r = results.get(e.data.id); if (r) { results.delete(e.data.id); e.data.error ? r.rej(new Error(e.data.error)) : r.res(e.data.res); } };
     async function simulate() {
       const id = ++runId, seed = 20261 + id;
-      if (worker) return new Promise((res, rej) => { results.set(id, { res, rej }); worker.postMessage({ id, rowA: A.eng, rowB: B.eng, venue, n: 40000, seed }); });
-      const { predict } = await import("../engine.js");
-      return predict(A.eng, B.eng, venue, { n: 40000, seed });
+      if (worker) return new Promise((res, rej) => { results.set(id, { res, rej }); worker.postMessage({ id, rowA: A.effEng, rowB: B.effEng, venue, n: 40000, seed, engine: core.engine }); });
+      return ENGINES[core.engine].predict(A.effEng, B.effEng, venue, { n: 40000, seed });
     }
 
     async function run() {
@@ -147,7 +146,7 @@ function histogram(h, nameA, nameB) {
     }
 
     function playOne() {
-      const g = playGame(A.eng, B.eng, venue);
+      const g = ENGINES[core.engine].playGame(A.effEng, B.effEng, venue);
       const win = g.scoreA > g.scoreB ? A : B;
       const nm = (side) => (side === "A" ? A.name : B.name);
       let showAll = false;

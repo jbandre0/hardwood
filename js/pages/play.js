@@ -1,7 +1,7 @@
 import { shell, fail } from "../ui.js";
 import { combobox } from "../combobox.js";
 import { loadCore, resetCores, esc, badge, teamLink, signed } from "../data.js";
-import { rollAndRecord, rollGame, recordRolled, playDay, undoLast, toOverlay, nextUnplayed, calc, setContent, syncTournament } from "../league/league.js";
+import { engineVersion, rollAndRecord, rollGame, recordRolled, playDay, undoLast, toOverlay, nextUnplayed, calc, setContent, syncTournament } from "../league/league.js";
 import { computeBoard } from "../league/bracketology.js";
 import { suggestField, validateField } from "../league/field.js";
 import { lockDay, lockPrediction, DEFAULT_SIMS } from "../league/predictions.js";
@@ -99,6 +99,10 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
 
         <div class="stack">
           ${season.day >= 54 || complete ? `<div class="card"><div class="card-head"><h2>Offseason</h2></div><p class="muted" style="margin-top:0">Awards, the tier review and creating next season.</p><a class="btn" href="offseason.html">Open the offseason</a></div>` : ""}
+          ${complete ? "" : `<div class="card" id="engineCard">
+            <div class="card-head"><h2>Engine</h2><span class="muted">${engineVersion(state) === "v10" ? "v10, realism ceiling" : "v9, original"}</span></div>
+            <p class="muted" style="margin-top:0;font-size:.88rem">v10 plays like v9 but holds runaway teams to what a real team could do (rated 34 at most, no 50% three-point lines) and caps anyone's chance of beating anyone at 99%. Each logged game records which engine played it, and predictions are scored separately per engine.</p>
+            <div class="seg" id="engineSeg" role="group" aria-label="Engine version"><button type="button" data-v="v10" class="${engineVersion(state) === "v10" ? "on" : ""}">v10</button><button type="button" data-v="v9" class="${engineVersion(state) === "v9" ? "on" : ""}">v9</button></div></div>`}
           ${complete ? "" : `<div class="card">
             <div class="card-head"><h2>Predictions</h2><a href="predictions.html">Scorecard</a></div>
             <p class="muted" style="margin-top:0;font-size:.9rem">Before a game is played, the engine's prediction is locked and later scored. ${state.predictions.size.toLocaleString()} locked so far.</p>
@@ -170,6 +174,7 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
     document.getElementById("exportBk")?.addEventListener("click", async () => { await downloadSeasonExport(core); await render(); const b = document.getElementById("bstatus"); if (b) b.textContent = "Export downloaded (it includes a full backup)."; });
     document.getElementById("staleDl")?.addEventListener("click", async () => { const blob = new Blob([JSON.stringify(await exportAll())], { type: "application/json" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `hardwood-old-${season.id}-data.json`; a.click(); });
     document.getElementById("staleDrop")?.addEventListener("click", async () => { if (!confirm(`Discard the older ${season.label} data saved in this browser? The imported season is not affected.`)) return; await clearOverlay(season.id); last = null; await render(); });
+    document.querySelectorAll("#engineSeg button").forEach((b) => b.addEventListener("click", async () => { if (b.dataset.v === engineVersion(state)) return; setContent(state, "engine", b.dataset.v); await persist(); clearPending(season.id); await render(); const f = document.querySelector(".rail-foot"); if (f) f.innerHTML = `Engine ${b.dataset.v} &middot; 40,000 sims per matchup`; }));
     document.getElementById("predOn")?.addEventListener("change", (e) => { try { localStorage.setItem("hw-pred-on", e.target.checked ? "1" : "0"); } catch { /* ignore */ } });
     const simsBox = document.getElementById("cbSims");
     if (simsBox) combobox(simsBox, { id: "predSims", value: String(predSims()), searchable: false, options: [1000, 2000, 3000, 5000, 10000, 40000].map((n) => ({ value: String(n), label: n.toLocaleString() + (n === 40000 ? " (backtest standard, slow)" : "") })), onChange: (v) => { try { localStorage.setItem("hw-pred-sims", v); } catch { /* ignore */ } } });

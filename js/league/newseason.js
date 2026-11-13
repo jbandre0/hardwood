@@ -4,6 +4,8 @@
 import { tierStats, seasonStart, posInTier } from "./stats.js";
 import { generateSchedule, validateSchedule, pairKey } from "./schedule.js";
 import { DEFAULT_OFFSEASON } from "./offseason.js";
+import { engineVersion, meanLine } from "./league.js";
+import { ceilingRow } from "../engine-v10.js";
 
 export const BOX_COLS = ["id", "OT", "FGM A", "FGA A", "3PM A", "3PA A", "FTM A", "FTA A", "OR A", "DR A", "TO A", "ST A", "POSS A", "FGM B", "FGA B", "3PM B", "3PA B", "FTM B", "FTA B", "OR B", "DR B", "TO B", "ST B", "POSS B"];
 export const GAME_COLS = ["id", "day", "type", "ctx", "a", "b", "home", "ptsA", "ptsB"];
@@ -32,10 +34,11 @@ export function marqueeIds(rows, league) {
  */
 export function buildNextSeason({ prev, prevState, prevCalc, review, settings = DEFAULT_OFFSEASON, marquee = [], seeds, id, label }) {
   const L = prev.league, S = prev.settings, carry = settings.carry ?? DEFAULT_OFFSEASON.carry;
-  const finalTier = new Map(review.map((r) => [r.team, r.final]));
+  const finalTier = new Map(review.map((r) => [r.team, r.final])), v10 = engineVersion(prevState) === "v10";
   const teams = L.map((t) => {
     const old = prev.teams[t.id], tier = finalTier.get(t.id) || old.tier;
-    const last = prevCalc.teams[t.id].live;   // the season's final engine line (Sim Live at the end)
+    // the season's final engine line (Sim Live at the end); under the v10 engine it carries over as the capped line the teams actually played with
+    const pc = prevCalc.teams[t.id], last = v10 ? ceilingRow(["", "", ...pc.live], pc.stats.GP ? pc.stats.rating : 0, meanLine(prevCalc)).slice(2) : pc.live;
     return { id: t.id, conf: old.conf, tier, pos: posInTier(t.seed), carry, start: seasonStart(tierStats(tier, t.seed, S), last, carry), prevTier: old.tier, prevFinal: last, prevRating: prevCalc.teams[t.id].stats.rating };
   });
   const mq = marqueeIds(marquee, L);

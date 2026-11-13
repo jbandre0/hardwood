@@ -1,8 +1,7 @@
 // Prediction tracker. Before a game is played on this site, the engine's prediction is locked: P(team A wins), expected
 // margin and total, the model version, when it was locked, how many simulations, and the exact engine rows used.
 // A locked prediction is never overwritten. After the game, it is scored (Brier, log loss, picks, margin and total error).
-import { predict } from "../engine.js";
-import { engineRow, venueOf, calc } from "./league.js";
+import { engineRow, engineOf, engineVersion, venueOf, calc } from "./league.js";
 
 export const DEFAULT_SIMS = 3000;
 export const BACKTEST = { label: "v9 backtest: real 2026 NCAA Tournament (67 games, 40,000 sims each)", games: 67, accuracy: 0.76, brier: 0.164, logLoss: 0.493, marginMAE: 10.5 };
@@ -16,9 +15,9 @@ export function lockPrediction(state, gameId, { n = DEFAULT_SIMS, at = new Date(
   if (!g) throw new Error(`Game ${gameId} is not on the schedule`);
   if (g.ptsA != null) throw new Error(`Game ${gameId} has already been played`);
   const rowA = engineRow(state, c, g.a), rowB = engineRow(state, c, g.b), venue = venueOf(g);
-  const r = predict(rowA, rowB, venue, { n, seed: (gameId * 2654435761) >>> 0, hist: false });
+  const ver = engineVersion(state), r = engineOf(state).predict(rowA, rowB, venue, { n, seed: (gameId * 2654435761) >>> 0, hist: false });
   const p = { id: gameId, day: g.day, type: g.type, a: g.a, b: g.b, venue, pA: r.p, margin: r4(r.margin), total: r4(r.total), sims: n,
-    version: (state.data.meta && state.data.meta.version) || "v9", at, rowA: rowA.map(r4), rowB: rowB.map(r4) };
+    version: ver, at, rowA: rowA.map(r4), rowB: rowB.map(r4) };
   state.predictions.set(gameId, p);
   return p;
 }

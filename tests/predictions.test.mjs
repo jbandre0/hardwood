@@ -12,7 +12,7 @@ test("lock a day, play it, score it; predictions survive the overlay round trip 
   assert.equal(n, st.games.filter((g) => g.day === day).length);
   const g0 = st.games.find((g) => g.day === day), before = { ...st.predictions.get(g0.id) };
   assert.throws(() => lockPrediction(st, g0.id, { n: 400 }), /already has a locked prediction/);
-  assert.equal(before.rowA.length, 26); assert.equal(before.version, "v9");
+  assert.equal(before.rowA.length, 26); assert.equal(before.version, "v10");   // the engine the game will be played with
   playDay(st, day, 42);
   assert.throws(() => lockPrediction(st, -1), /not on the schedule/);
   assert.throws(() => lockPrediction(st, st.games.find((g) => g.day === day && !st.predictions.has(g.id))?.id ?? st.games.find((g) => g.day === day).id), /already|played/);

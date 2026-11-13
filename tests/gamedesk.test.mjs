@@ -1,16 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readJSON } from "./util.mjs";
-import { loadSeasonData, createState, calc, rollGame, recordRolled, nextUnplayed, engineRow, venueOf, playDay } from "../js/league/league.js";
-import { playRecordedGame } from "../js/engine.js";
+import { loadSeasonData, createState, calc, rollGame, recordRolled, nextUnplayed, engineRow, engineOf, venueOf, playDay } from "../js/league/league.js";
 import { lockPrediction } from "../js/league/predictions.js";
 
 const data = await loadSeasonData("season-2", async (p) => readJSON(p));
 
-test("playing a season game is exactly ONE engine game (same as one playRecordedGame call with that seed)", () => {
+test("playing a season game is exactly ONE engine game (same as one playRecordedGame call of the selected engine with that seed)", () => {
   const st = createState(data), c = calc(st), g = nextUnplayed(st);
   const r = rollGame(st, g.id, 12345);
-  const one = playRecordedGame(engineRow(st, c, g.a), engineRow(st, c, g.b), venueOf(g), { seed: 12345 });
+  const one = engineOf(st).playRecordedGame(engineRow(st, c, g.a), engineRow(st, c, g.b), venueOf(g), { seed: 12345 });
   assert.deepEqual([r.ptsA, r.ptsB, r.ot, r.boxA, r.boxB], [one.ptsA, one.ptsB, one.ot, one.boxA, one.boxB]);
   assert.ok(Number.isInteger(r.ptsA) && Number.isInteger(r.ptsB), "a real final score, not an average of many games");
 });

@@ -90,7 +90,7 @@ import { saveOverlay } from "../league/store.js";
     function wireAp() {
       const P = polls();
       const nb = panel.querySelector("#newBallot");
-      if (nb) nb.onclick = () => { const last = P[P.length - 1]; editing = { week: last ? last.week + 1 : 0, afterDay: last ? season.day : 0, ranks: suggestBallot(), isNew: true }; editor(); };
+      if (nb) nb.onclick = () => { const last = P[P.length - 1]; editing = { week: last ? last.week + 1 : 0, afterDay: last ? season.day : 0, ranks: last ? last.ranks.slice() : suggestBallot(), isNew: true }; editor(); };   // a new ballot starts from last week's (the first one from the suggestion)
       const eb = panel.querySelector("#editBallot");
       if (eb) eb.onclick = () => { const last = P[P.length - 1]; editing = { ...last, ranks: last.ranks.slice(), isNew: false }; editor(); };
       const db = panel.querySelector("#delBallot");
@@ -103,14 +103,14 @@ import { saveOverlay } from "../league/store.js";
       const dupes = e.ranks.filter((id, i) => e.ranks.indexOf(id) !== i);
       panel.innerHTML = `
         <div class="card-head"><h2>${e.week === 0 ? "Preseason ballot" : "Week " + e.week + " ballot"}</h2><span class="muted">${e.week === 0 ? "before day 1" : "after day " + e.afterDay}</span></div>
-        <p class="muted" style="margin-top:-4px">Pre-filled with a suggestion (rating, adjusted for record). Swap any team with the box, move it with the arrows. Nothing is saved until you press Save.</p>
+        <p class="muted" style="margin-top:-4px">${e.isNew && prev ? `Starts from the ${prev.week === 0 ? "preseason" : "Week " + esc(String(prev.week))} poll.` : "Pre-filled with a suggestion (rating, adjusted for record)."} Swap any team with the box, move it with the arrows. Nothing is saved until you press Save.</p>
         <div class="table-wrap"><table><thead><tr><th class="c">#</th><th>Team</th><th class="r">Record</th><th class="r">Rating</th><th class="c">Last week</th><th></th></tr></thead><tbody>
           ${e.ranks.map((id, i) => { const t = core.teams[id];
             return `<tr data-i="${i}"><td class="rank c">${i + 1}</td><td style="min-width:240px"><div class="ed-team"></div></td><td class="r num">${t.w}-${t.l}</td><td class="r num">${t.rating.toFixed(1)}</td><td class="c">${rankMove(prevRank, id, i + 1)}</td>
               <td class="r" style="white-space:nowrap"><button class="btn ghost ed-up" type="button" aria-label="Move up" ${i ? "" : "disabled"}>▲</button> <button class="btn ghost ed-dn" type="button" aria-label="Move down" ${i < 24 ? "" : "disabled"}>▼</button></td></tr>`; }).join("")}
         </tbody></table></div>
         ${dupes.length ? `<p class="down" style="margin:10px 0 0">A team is on the ballot twice: ${dupes.map((id) => esc(core.teams[id].name)).join(", ")}</p>` : ""}
-        <div class="btn-row" style="margin-top:14px"><button class="btn" id="saveBallot" type="button" ${dupes.length ? "disabled" : ""}>Save ballot</button><button class="btn ghost" id="sugBallot" type="button">Reset to suggestion</button><button class="btn ghost" id="cancelBallot" type="button">Cancel</button></div>`;
+        <div class="btn-row" style="margin-top:14px"><button class="btn" id="saveBallot" type="button" ${dupes.length ? "disabled" : ""}>Save ballot</button>${prev ? `<button class="btn ghost" id="prevBallot" type="button">Reset to last poll</button>` : ""}<button class="btn ghost" id="sugBallot" type="button">Use the suggestion</button><button class="btn ghost" id="cancelBallot" type="button">Cancel</button></div>`;
       panel.querySelectorAll("tr[data-i]").forEach((tr) => {
         const i = +tr.dataset.i;
         combobox(tr.querySelector(".ed-team"), { value: String(e.ranks[i]), options: opts, onChange: (v) => { e.ranks[i] = +v; editor(); } });
@@ -118,6 +118,7 @@ import { saveOverlay } from "../league/store.js";
         tr.querySelector(".ed-dn").onclick = () => { [e.ranks[i + 1], e.ranks[i]] = [e.ranks[i], e.ranks[i + 1]]; editor(); };
       });
       panel.querySelector("#sugBallot").onclick = () => { e.ranks = suggestBallot(); editor(); };
+      panel.querySelector("#prevBallot")?.addEventListener("click", () => { e.ranks = prev.ranks.slice(); editor(); });
       panel.querySelector("#cancelBallot").onclick = () => { editing = null; ap(); };
       panel.querySelector("#saveBallot").onclick = async () => {
         const ballot = { week: e.week, afterDay: e.afterDay, ranks: e.ranks.slice() };

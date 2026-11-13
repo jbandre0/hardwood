@@ -5,6 +5,12 @@ Live site: GitHub Pages for this repo (deploys from `main` in about a minute). T
 possession Monte Carlo. v9 (`js/engine.js`) is **frozen**; v10 (`js/engine-v10.js`, the default since the commissioner asked for a realism ceiling) wraps it
 with a strength cap, a single-stat cap and a 99% win-probability cap (1.5% "chaos" games since Season 2 day 28, 2% before; each logged game records its `chaosRate`). Any further engine change is a new version and needs the commissioner's say-so.
 
+## Two leagues
+A brand-new browser opens its **own league** (blank Season 1 with the original Season 1 tiers, separate storage `hardwood-sim-mine`);
+a browser with the commissioner's data opens the **commissioner's league** (storage `hardwood-sim`). Sidebar footer switches. Never
+let one league read or write the other's storage, editions, challenge entry or backups (`js/league/store.js`, `js/league/fresh.js`).
+Everything below about data and bracketology is about the commissioner's league.
+
 ## The one thing to know about data
 Everything the commissioner does on the site (games played, ballots, predictions, offseason choices, seasons created) is saved
 **in their browser**, not in this repo. The repo only has the imported baseline (Season 1 complete, Season 2 through day 15

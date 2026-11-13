@@ -4,7 +4,7 @@ const BASE = process.env.BASE || 'http://localhost:8000/';
 const bad = []; let pass = 0;
 const ok = (c, m) => { if (c) pass++; else { bad.push(m); console.log('FAIL ' + m); } };
 (async () => {
-  const b = await chromium.launch(); const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
+  const b = await chromium.launch(); { const nc = b.newContext.bind(b); b.newContext = async (o) => { const c = await nc(o); await c.addInitScript(() => { try { if (!localStorage.getItem('hw-league')) localStorage.setItem('hw-league', 'main'); } catch (e) {} }); return c; }; } /* these tests run in the commissioner's league */ const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
   for (const season of ['season-1', 'season-2']) {
     await ctx.addInitScript((s) => { try { localStorage.setItem('hw-season', s); } catch (e) {} }, season);
     for (const url of ['index.html', 'rankings.html', 'rankings.html#ap', 'standings.html', 'matchup.html?a=virginia&b=duke', 'team.html?t=virginia', 'bracket.html', 'bracketology.html', 'news.html', 'challenge.html', 'stats.html', 'stats.html?tab=records', 'stats.html?tab=league', 'history.html', 'predictions.html', 'offseason.html', 'recap.html?day=13', 'rankings.html#poll', 'about.html', 'play.html']) {

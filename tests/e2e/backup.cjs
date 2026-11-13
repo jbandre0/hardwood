@@ -6,7 +6,7 @@ const BASE = process.env.BASE || 'http://localhost:8000/', FILE = __dirname + '/
 let pass = 0, fail = 0; const ok = (c, m) => { c ? pass++ : (fail++, console.log('FAIL ' + m)); if (c) console.log('PASS ' + m); };
 const original = fs.readFileSync(FILE);
 (async () => {
-  const b = await chromium.launch();
+  const b = await chromium.launch(); { const nc = b.newContext.bind(b); b.newContext = async (o) => { const c = await nc(o); await c.addInitScript(() => { try { if (!localStorage.getItem('hw-league')) localStorage.setItem('hw-league', 'main'); } catch (e) {} }); return c; }; } /* these tests run in the commissioner's league */
   try {
     const ctx = await b.newContext({ acceptDownloads: true }); await ctx.addInitScript(() => { try { localStorage.setItem('hw-season', 'season-2'); localStorage.setItem('hw-pred-on', '0'); } catch (e) {} });
     const p = await ctx.newPage(); await p.goto(BASE + 'play.html', { waitUntil: 'networkidle' }); await p.waitForSelector('#gameDesk .gd-score');

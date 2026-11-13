@@ -9,7 +9,7 @@ import { dayDone } from "../league/recap.js";
 import { downloadSeasonExport } from "../export-download.js";
 import { startWatch } from "../watch-view.js";
 import { folderSupported, pickFolder, forgetFolder, savedFolder, folderPermission, backupToFolder, autoBackup, lastBackup } from "../folder-backup.js";
-import { saveOverlay, clearOverlay, exportAll, importAll, loadOverlay, unsavedSince, protectStorage } from "../league/store.js";
+import { saveOverlay, clearOverlay, exportAll, importAll, loadOverlay, unsavedSince, protectStorage, leagueModeNow } from "../league/store.js";
 
 const seed = () => crypto.getRandomValues(new Uint32Array(1))[0];
 const predOn = () => { try { return localStorage.getItem("hw-pred-on") !== "0"; } catch { return true; } };
@@ -161,7 +161,8 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
       const lb = lastBackup(); if (!lb || Date.now() - new Date(lb.at).getTime() > 3600e3) autoBackup({ season: season.id, day: season.day }).then((i) => { if (i) folderUI(); });
     }
     // weekly backup saved to GitHub by the bracketology session (data/backups/latest.json)
-    fetch("data/backups/latest.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((B) => {
+    // (the commissioner's league only: a visitor's own league must never pull the commissioner's games in)
+    if (leagueModeNow() === "main") fetch("data/backups/latest.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((B) => {
       const el = document.getElementById("repoBackup"); if (!el || !B || B.none || !B.overlays) return;
       const mine = state.recorded.length, theirs = (B.counts || {})[season.id] ?? 0;
       el.innerHTML = `Weekly backup on GitHub: ${esc(B.from.label)} through day ${B.from.throughDay}, saved ${new Date(B.savedToRepoAt).toLocaleDateString()}. <button class="btn ghost" id="restoreRepo" type="button" style="padding:4px 10px;font-size:.82rem">Restore it</button>`;
@@ -239,7 +240,10 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
       const f = e.target.files[0]; if (!f) return;
       try {
         const obj = JSON.parse(await f.text()); const seasons = Object.keys(obj.overlays || {});
-        if (!confirm(`Restore ${seasons.join(", ")} from this backup? It replaces what is recorded in this browser for those seasons.`)) return;
+        const from = obj.league || "main", here = leagueModeNow();
+        const whose = (m) => (m === "mine" ? "someone's own league" : "the commissioner's league");
+        const cross = from !== here ? `\n\nHeads up: this backup is from ${whose(from)}, and you're in ${whose(here)}. It will be restored into ${whose(here)}.` : "";
+        if (!confirm(`Restore ${seasons.join(", ")} from this backup? It replaces what is recorded in this browser for those seasons.${cross}`)) return;
         await importAll(obj); await render(); document.getElementById("bstatus").textContent = `Restored ${seasons.join(", ")}.`;
       } catch (err) { bstatus.textContent = "Could not restore: " + err.message; }
     });

@@ -1,21 +1,65 @@
 // Browser storage for what the commissioner records on the site (games, polls, picks, articles...).
 // IndexedDB first, localStorage as a fallback. Everything can be exported to one JSON file and restored from it.
 // Nothing here ever touches the baseline data files.
-const DB = "hardwood-sim", STORE = "overlays", LS = "hw-overlay-";
+//
+// Two leagues can live in one browser, in completely separate storage:
+//   "main": the commissioner's league (the repo's seasons plus what was recorded here). Database "hardwood-sim".
+//   "mine": a visitor's own league, which starts as a blank Season 1 (see fresh.js). Database "hardwood-sim-mine".
+// A browser that already has commissioner data opens "main"; a brand-new browser opens "mine". Switching never deletes anything.
+const STORE = "overlays";
+const NS = { main: { db: "hardwood-sim", ls: "hw-overlay-", key: "hw-" }, mine: { db: "hardwood-sim-mine", ls: "hwmine-overlay-", key: "hwmine-" } };
+const MODE_KEY = "hw-league";
+export const LEAGUE_MODES = ["main", "mine"];
 
-function openDB() {
+let modeNow = null, modePromise = null;
+/** "main" or "mine" (resolved once per page load). */
+export function leagueMode() { return (modePromise ||= resolveMode().then((m) => (modeNow = m))); }
+/** the mode, synchronously, once leagueMode() has resolved ("main" before that) */
+export const leagueModeNow = () => modeNow || "main";
+/** per-league localStorage key for things like the selected season ("hw-season" in the commissioner's league) */
+export const modeKey = (k) => NS[leagueModeNow()].key + k;
+export function setLeagueMode(m) { if (!LEAGUE_MODES.includes(m)) throw new Error("unknown league " + m); try { localStorage.setItem(MODE_KEY, m); } catch { /* ignore */ } modeNow = m; modePromise = Promise.resolve(m); }
+
+async function resolveMode() {
+  try {
+    const q = typeof location !== "undefined" ? new URLSearchParams(location.search).get("league") : null;
+    if (LEAGUE_MODES.includes(q)) { try { localStorage.setItem(MODE_KEY, q); } catch { /* ignore */ } return q; }
+  } catch { /* ignore */ }
+  let saved = null;
+  try { saved = localStorage.getItem(MODE_KEY); } catch { return "main"; }
+  if (LEAGUE_MODES.includes(saved)) return saved;
+  // First visit since leagues existed: anything already recorded in the commissioner's storage means this is their browser.
+  let has;
+  try { has = await hasMainData(); } catch { return "main"; }      // can't tell: never hide an existing league
+  const m = has ? "main" : "mine";
+  try { localStorage.setItem(MODE_KEY, m); } catch { /* ignore */ }
+  return m;
+}
+/** does this browser have anything saved for the commissioner's league? (read only) */
+export async function hasMainData() {
+  try { for (let i = 0; i < localStorage.length; i++) if (localStorage.key(i).startsWith(NS.main.ls)) return true; } catch { /* ignore */ }
+  if (typeof indexedDB === "undefined") return false;
+  if (indexedDB.databases) { const dbs = await indexedDB.databases(); if (!dbs.some((d) => d.name === NS.main.db)) return false; }
+  const db = await openDB(NS.main.db);
+  try { const n = await tx(db, "readonly", (s) => s.count()); return n > 0; } finally { db.close(); }
+}
+
+function openDB(name) {
   return new Promise((res, rej) => {
     if (typeof indexedDB === "undefined") return rej(new Error("no indexedDB"));
-    const req = indexedDB.open(DB, 1);
+    const req = indexedDB.open(name, 1);
     req.onupgradeneeded = () => req.result.createObjectStore(STORE);
     req.onsuccess = () => res(req.result);
     req.onerror = () => rej(req.error);
   });
 }
 const tx = (db, mode, fn) => new Promise((res, rej) => { const t = db.transaction(STORE, mode), r = fn(t.objectStore(STORE)); t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
+const ns = async () => NS[await leagueMode()];
+const openLeague = async () => openDB((await ns()).db);
 
 export async function loadOverlay(seasonId) {
-  try { const db = await openDB(); const v = await tx(db, "readonly", (s) => s.get(seasonId)); db.close(); if (v) return v; } catch { /* fall through */ }
+  const LS = (await ns()).ls;
+  try { const db = await openLeague(); const v = await tx(db, "readonly", (s) => s.get(seasonId)); db.close(); if (v) return v; } catch { /* fall through */ }
   try { const raw = localStorage.getItem(LS + seasonId); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
 
@@ -23,19 +67,21 @@ let asked = false;
 export async function saveOverlay(seasonId, overlay) {
   if (!asked) { asked = true; protectStorage(); }
   overlay = { ...overlay, savedAt: new Date().toISOString() };
-  try { const db = await openDB(); await tx(db, "readwrite", (s) => s.put(overlay, seasonId)); db.close(); return "indexeddb"; }
+  const LS = (await ns()).ls;
+  try { const db = await openLeague(); await tx(db, "readwrite", (s) => s.put(overlay, seasonId)); db.close(); return "indexeddb"; }
   catch { try { localStorage.setItem(LS + seasonId, JSON.stringify(overlay)); return "localstorage"; } catch (e) { throw new Error("Could not save to this browser: " + e.message); } }
 }
 
 export async function clearOverlay(seasonId) {
-  try { const db = await openDB(); await tx(db, "readwrite", (s) => s.delete(seasonId)); db.close(); } catch { /* ignore */ }
+  const LS = (await ns()).ls;
+  try { const db = await openLeague(); await tx(db, "readwrite", (s) => s.delete(seasonId)); db.close(); } catch { /* ignore */ }
   try { localStorage.removeItem(LS + seasonId); } catch { /* ignore */ }
 }
 
 export async function listOverlays() {
-  const out = {};
+  const out = {}, LS = (await ns()).ls;
   try {
-    const db = await openDB();
+    const db = await openLeague();
     const keys = await tx(db, "readonly", (s) => s.getAllKeys());
     for (const k of keys) out[k] = await loadOverlay(k);
     db.close();
@@ -47,8 +93,8 @@ export async function listOverlays() {
 /** One file with every season's browser-saved changes. */
 export async function exportAll() {
   const overlays = await listOverlays();
-  try { localStorage.setItem("hw-last-export", String(Date.now())); const counts = {}; for (const [id, o] of Object.entries(overlays)) if (isSeasonKey(id)) counts[id] = (o.order || []).length; localStorage.setItem("hw-last-export-counts", JSON.stringify(counts)); } catch { /* ignore */ }
-  return { format: 1, app: "hardwood-sim", exportedAt: new Date().toISOString(), overlays };
+  try { localStorage.setItem(modeKey("last-export"), String(Date.now())); const counts = {}; for (const [id, o] of Object.entries(overlays)) if (isSeasonKey(id)) counts[id] = (o.order || []).length; localStorage.setItem(modeKey("last-export-counts"), JSON.stringify(counts)); } catch { /* ignore */ }
+  return { format: 1, app: "hardwood-sim", league: leagueModeNow(), exportedAt: new Date().toISOString(), overlays };
 }
 
 export async function importAll(obj) {
@@ -61,7 +107,7 @@ export async function importAll(obj) {
 /** How many games are recorded in this browser that are not in the last exported backup. */
 export function unsavedSince(seasonId, overlay) {
   try {
-    const counts = JSON.parse(localStorage.getItem("hw-last-export-counts") || "{}");
+    const counts = JSON.parse(localStorage.getItem(modeKey("last-export-counts")) || "{}");
     return Math.max(0, ((overlay && overlay.order) || []).length - (counts[seasonId] || 0));
   } catch { return ((overlay && overlay.order) || []).length; }
 }

@@ -1,6 +1,7 @@
 // App shell: rail nav, top bar with team search, theme toggle.
 import { loadCore, esc, teamHref, seasonsIndex, activeSeasonId, setActiveSeason } from "./data.js";
 import { combobox } from "./combobox.js";
+import { leagueMode, setLeagueMode } from "./league/store.js";
 
 const I = {
   home: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/>',
@@ -115,7 +116,21 @@ export function fail(view, err) {
 }
 
 async function wireSeasons() {
-  loadCore().then((c) => { const f = document.querySelector(".rail-foot"); if (f) f.innerHTML = `Engine ${c.engine} &middot; 40,000 sims per matchup`; }).catch(() => {});
+  Promise.all([loadCore(), leagueMode()]).then(([c, m]) => {
+    const f = document.querySelector(".rail-foot"); if (!f) return;
+    // whose league this browser is showing, and a switch (switching never deletes anything; each league keeps its own storage)
+    const other = m === "mine" ? "main" : "mine";
+    f.innerHTML = `Engine ${c.engine} &middot; 40,000 sims per matchup<br><span class="league-tag" data-league="${m}">${m === "mine" ? "Your own league" : "The commissioner's league"}</span> &middot; <a href="#" id="leagueSwitch">${m === "mine" ? "View the commissioner's" : "Start or open your own"}</a>`;
+    f.querySelector("#leagueSwitch").addEventListener("click", (e) => {
+      e.preventDefault();
+      const msg = other === "mine"
+        ? "Open your own league? It starts as a blank Season 1 with the original tiers, saved only in this browser. The commissioner's league stays exactly as it is, and you can switch back any time."
+        : "View the commissioner's league? Your own league stays saved in this browser, and you can switch back any time.";
+      if (!confirm(msg)) return;
+      setLeagueMode(other); const u = new URL(location.href); u.searchParams.delete("league"); u.searchParams.delete("s");
+      location.href = u.pathname.endsWith("team.html") ? "index.html" : u.toString();
+    });
+  }).catch(() => {});
   const box = document.getElementById("seasonPick");
   if (!box) return;
   try {

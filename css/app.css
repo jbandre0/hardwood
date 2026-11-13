@@ -54,7 +54,9 @@ p { margin: 0 0 1em; }
 .nav a svg { width: 19px; height: 19px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .nav a:hover { background: var(--card); color: var(--text); }
 .nav a[aria-current="page"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.rail-foot { margin-top: auto; padding: 12px; font-size: .78rem; color: var(--faint); }
+.rail-foot { margin-top: auto; padding: 12px; font-size: .78rem; color: var(--faint); line-height: 1.5; }
+.rail-foot .league-tag { color: var(--muted, inherit); font-weight: 600; }
+.rail-foot a { color: inherit; text-decoration: underline; }
 .main { min-width: 0; padding: 0 var(--gutter) 64px; }
 .topbar { display: flex; align-items: center; gap: 12px; padding: 18px 0; position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
 .search { position: relative; flex: 1; max-width: 460px; }

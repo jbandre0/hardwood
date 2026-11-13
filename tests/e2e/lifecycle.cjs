@@ -7,7 +7,7 @@ const BASE = process.env.BASE || 'http://localhost:8000/';
 let pass = 0, fail = 0; const ok = (c, m) => { c ? pass++ : (fail++, console.log('FAIL ' + m)); if (c) console.log('PASS ' + m); };
 const txt = (p) => p.locator('main').innerText();
 (async () => {
-  const b = await chromium.launch(); const ctx = await b.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
+  const b = await chromium.launch(); { const nc = b.newContext.bind(b); b.newContext = async (o) => { const c = await nc(o); await c.addInitScript(() => { try { if (!localStorage.getItem('hw-league')) localStorage.setItem('hw-league', 'main'); } catch (e) {} }); return c; }; } /* these tests run in the commissioner's league */ const ctx = await b.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   await ctx.addInitScript(() => { try { if (!localStorage.getItem('hw-init')) { localStorage.setItem('hw-season', 'season-2'); localStorage.setItem('hw-pred-sims', '1000'); localStorage.setItem('hw-init', '1'); } } catch (e) {} });
   const errs = []; ctx.on('page', (pg) => { pg.on('pageerror', (e) => errs.push(pg.url().split('/').pop() + ': ' + e.message)); pg.on('dialog', (d) => d.accept()); });
   const p = await ctx.newPage();

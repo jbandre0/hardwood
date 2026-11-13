@@ -1,7 +1,8 @@
 // Data loading + derived structures shared by every page.
 
 import { loadSeasonData, createState, calc, lastPlayedDay, playedCount, engineRow, engineVersion } from "./league/league.js";
-import { loadOverlay, seasonMeta, loadLocalSeason } from "./league/store.js";
+import { loadOverlay, seasonMeta, loadLocalSeason, leagueMode, modeKey, saveLocalSeason, updateSeasonMeta } from "./league/store.js";
+import { buildFreshSeason1, FRESH_FILES } from "./league/fresh.js";
 
 const cache = new Map();
 export function fetchJSON(path) {
@@ -21,9 +22,12 @@ let idxPromise = null;
 /** Static seasons (data/seasons/index.json) plus seasons created in this browser, with status changes applied. */
 export function seasonsIndex() {
   if (!idxPromise) idxPromise = (async () => {
-    const base = (await getJSON("seasons/index")).map((s) => ({ ...s }));
+    const mode = await leagueMode();
+    // a visitor's own league has no repo seasons: only what was created in this browser, starting with a blank Season 1
+    const base = mode === "mine" ? [] : (await getJSON("seasons/index")).map((s) => ({ ...s }));
     let meta = { status: {}, local: [] };
     try { meta = await seasonMeta(); } catch { /* storage blocked */ }
+    if (mode === "mine" && !meta.local.length) { await ensureFreshLeague(); meta = await seasonMeta(); }
     for (const id of meta.local) {
       try { const b = await loadLocalSeason(id); if (b && b.info) base.push({ ...b.info, files: Object.keys(b.files) }); } catch { /* ignore */ }
     }
@@ -33,16 +37,24 @@ export function seasonsIndex() {
   return idxPromise;
 }
 export function resetSeasonsIndex() { idxPromise = null; }
+
+/** Create the blank Season 1 of a visitor's own league (once). The repo files are only read, never changed. */
+async function ensureFreshLeague() {
+  const files = Object.fromEntries(await Promise.all(FRESH_FILES.map(async ([k, path]) => [k, await fetchJSON(path)])));
+  const { info, files: out } = buildFreshSeason1(files);
+  await saveLocalSeason(info, out);
+  await updateSeasonMeta((m) => { if (!m.local.includes(info.id)) m.local.push(info.id); m.current = info.id; });
+}
 export async function activeSeasonId() {
   const idx = await seasonsIndex();
   const ids = idx.map((s) => s.id);
   const q = new URLSearchParams(location.search).get("s");
-  if (q && ids.includes(q)) { try { localStorage.setItem("hw-season", q); } catch { /* ignore */ } return q; }
-  try { const saved = localStorage.getItem("hw-season"); if (saved && ids.includes(saved)) return saved; } catch { /* ignore */ }
+  if (q && ids.includes(q)) { try { localStorage.setItem(modeKey("season"), q); } catch { /* ignore */ } return q; }
+  try { const saved = localStorage.getItem(modeKey("season")); if (saved && ids.includes(saved)) return saved; } catch { /* ignore */ }
   const live = [...idx].reverse().find((s) => s.status === "in-progress");
   return (live || idx[idx.length - 1]).id;
 }
-export function setActiveSeason(id) { try { localStorage.setItem("hw-season", id); } catch { /* ignore */ } }
+export function setActiveSeason(id) { try { localStorage.setItem(modeKey("season"), id); } catch { /* ignore */ } }
 
 let LOGOS = {}; // team slug -> {f, t?} (set when a season loads)
 const cores = new Map();
@@ -62,7 +74,10 @@ async function buildCore(seasonId) {
   if (info && info.local) {
     const b = await loadLocalSeason(id);
     if (!b) throw new Error(`${info.label} is missing from this browser's storage. Restore it from a backup file on the Commissioner desk.`);
-    loader = (p) => (p.startsWith(`data/seasons/${id}/`) ? Promise.resolve(b.files[p.slice(`data/seasons/${id}/`.length, -5)] ?? Promise.reject(new Error("missing"))) : fetchJSON(p));
+    const own = (await leagueMode()) === "mine";
+    // a visitor's league never picks up the commissioner's published editions or bracket-challenge entry
+    loader = (p) => (p.startsWith(`data/seasons/${id}/`) ? Promise.resolve(b.files[p.slice(`data/seasons/${id}/`.length, -5)] ?? Promise.reject(new Error("missing")))
+      : own && (p === "data/editions.json" || p === "data/challenge.json") ? Promise.resolve({}) : fetchJSON(p));
   }
   const [data, overlay, logos] = await Promise.all([loadSeasonData(id, loader, info && info.files), loadOverlay(id).catch(() => null), getJSON("logos").catch(() => ({}))]);
   LOGOS = logos;

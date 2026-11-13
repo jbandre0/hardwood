@@ -3,7 +3,7 @@
 The commissioner runs a fantasy college basketball league (365 D-I teams, 31 conferences) on this static website.
 Live site: GitHub Pages for this repo (deploys from `main` in about a minute). The simulation engine is possession by
 possession Monte Carlo. v9 (`js/engine.js`) is **frozen**; v10 (`js/engine-v10.js`, the default since the commissioner asked for a realism ceiling) wraps it
-with a strength cap, a single-stat cap and a 99% win-probability cap. Any further engine change is a new version and needs the commissioner's say-so.
+with a strength cap, a single-stat cap and a 99% win-probability cap (1.5% "chaos" games since Season 2 day 28, 2% before; each logged game records its `chaosRate`). Any further engine change is a new version and needs the commissioner's say-so.
 
 ## The one thing to know about data
 Everything the commissioner does on the site (games played, ballots, predictions, offseason choices, seasons created) is saved

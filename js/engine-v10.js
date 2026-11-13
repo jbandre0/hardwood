@@ -14,16 +14,17 @@
 //  2. SINGLE-STAT CEILING. Each stat is soft-limited to just past the best and worst any real team had in any tier (the Tier
 //     Setup ranges): a stat may go 3% beyond the real best (or worst) freely and is squeezed toward 4% beyond it, so a team can
 //     exceed what was ever achieved but not excessively, and nobody shoots 50% from three or turns it over 6 times a game.
-//  3. WIN-PROBABILITY CEILING. In 2% of games ("chaos") both teams play as one equal team on a neutral floor, a freak night
+//  3. WIN-PROBABILITY CEILING. In 1.5% of games ("chaos") both teams play as one equal team on a neutral floor, a freak night
 //     where the favorite's edge disappears. That caps any team's chance against any other team at about 99%
-//     (98% x 100% + 2% x 50%) and shaves a little off every favorite.
+//     (98.5% x 100% + 1.5% x 50%) and shaves a little off every favorite. (It was 2% until Season 2 day 27; the
+//     commissioner cut it to 1.5% because too many 30-point underdogs were winning. Each logged game records the rate.)
 //
 // Steps 1 and 2 are done by ceilingRow() (league.js engineRow() calls it); step 3 lives in playRecordedGame(), playGame()
 // and predict() below, which take rows that already went through ceilingRow().
 import { playRecordedGame as playRecordedGame9, predict as predict9, playGame as playGame9, makeRng } from "./engine.js";
 
 export const VERSION = "v10";
-export const CHAOS = 0.02;
+export const CHAOS = 0.015;
 export const STRENGTH = { hiKnee: 26, hiMax: 34, loKnee: -24, loMax: -31 };
 export const STAT_ROOM = { free: 0.03, max: 0.04 };   // beyond the real-life best/worst, as a share of that value
 
@@ -88,7 +89,7 @@ export const isChaos = (seed) => makeRng(((seed >>> 0) ^ 0xa5a5a5a5) >>> 0)() < 
 export function playRecordedGame(rowA, rowB, venue = "neutral", opts = {}) {
   const seed = opts.seed ?? (Math.random() * 2 ** 32) >>> 0, chaos = isChaos(seed);
   const res = chaos ? (([a, b]) => playRecordedGame9(a, b, "neutral", { ...opts, seed }))(equalize(rowA, rowB)) : playRecordedGame9(rowA, rowB, venue, { ...opts, seed });
-  return { ...res, chaos, engine: VERSION };
+  return { ...res, chaos, chaosRate: CHAOS, engine: VERSION };
 }
 
 export function playGame(rowA, rowB, venue = "neutral", opts = {}) {

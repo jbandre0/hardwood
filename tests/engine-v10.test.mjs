@@ -64,8 +64,8 @@ test("a team at the top of the ratings is about as strong as the best real team,
 test("win probability ceiling: 99% at most, for anyone against anyone, on any floor", () => {
   for (const venue of ["neutral", "B_home", "A_home"]) {
     const r = V10.predict(R10(best), R10(worst), venue, { n: 60000, hist: false, seed: 11 }), p = venue === "B_home" ? 1 - r.p : r.p;
-    assert.ok(r.p <= 0.9935 && r.p >= 0.005 || (1 - r.p) <= 0.9935, `${venue}: ${r.p}`);
-    assert.ok(Math.max(r.p, 1 - r.p) <= 0.9935 && Math.max(r.p, 1 - r.p) >= 0.975, `${venue}: best vs worst ${(Math.max(r.p, 1 - r.p) * 100).toFixed(2)}%`); void p;
+    assert.ok(r.p <= 0.996 && r.p >= 0.004 || (1 - r.p) <= 0.996, `${venue}: ${r.p}`);
+    assert.ok(Math.max(r.p, 1 - r.p) <= 0.996 && Math.max(r.p, 1 - r.p) >= 0.975, `${venue}: best vs worst ${(Math.max(r.p, 1 - r.p) * 100).toFixed(2)}%`); void p;
     const v9 = V9.predict(R9(best), R9(worst), venue, { n: 20000, hist: false, seed: 11 }); assert.ok(Math.max(v9.p, 1 - v9.p) > 0.999, "v9 gave the favorite " + Math.max(v9.p, 1 - v9.p));
   }
   const vs25 = V10.predict(R10(best), R10(t25), "neutral", { n: 40000, hist: false, seed: 12 }), vs25v9 = V9.predict(R9(best), R9(t25), "neutral", { n: 40000, hist: false, seed: 12 });
@@ -73,8 +73,8 @@ test("win probability ceiling: 99% at most, for anyone against anyone, on any fl
   const vs10 = V10.predict(R10(best), R10(t10), "neutral", { n: 40000, hist: false, seed: 13 }); assert.ok(vs10.p < 0.8, `best vs 10th: ${vs10.p.toFixed(3)}`);
 });
 
-test("chaos games: about 2% of games, deterministic per seed, and an upset of the worst over the best happens about 1% of the time", () => {
-  let n = 0; for (let s = 1; s <= 20000; s++) if (V10.isChaos(s)) n++; assert.ok(n > 300 && n < 520, "chaos games in 20,000 seeds: " + n);
+test("chaos games: about 1.5% of games, deterministic per seed, and an upset of the worst over the best happens about 1% of the time", () => {
+  let n = 0; for (let s = 1; s <= 20000; s++) if (V10.isChaos(s)) n++; assert.ok(n > 220 && n < 400, "chaos games in 20,000 seeds: " + n);
   assert.equal(V10.isChaos(777), V10.isChaos(777));
   const A = R10(best), B = R10(worst); let worstWins = 0; const G = 3000;
   for (let s = 1; s <= G; s++) { const r = V10.playRecordedGame(A, B, "neutral", { seed: s * 7 + 1 }); if (r.ptsB > r.ptsA) worstWins++; assert.equal(r.engine, "v10"); }

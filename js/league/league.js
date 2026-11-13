@@ -145,7 +145,7 @@ export function record(state, gameId, result, meta = {}) {
   if (result.ptsA === result.ptsB) throw new Error("tied score");
   g.ptsA = result.ptsA; g.ptsB = result.ptsB;
   state.box.set(gameId, boxRow(gameId, result));
-  state.recorded.push(gameId); state.meta[gameId] = { seed: result.seed, at: meta.at || new Date().toISOString(), engine: result.engine || "v9", ...(result.chaos ? { chaos: true } : {}), ...meta };
+  state.recorded.push(gameId); state.meta[gameId] = { seed: result.seed, at: meta.at || new Date().toISOString(), engine: result.engine || "v9", ...(result.chaos ? { chaos: true } : {}), ...(result.chaosRate != null ? { chaosRate: result.chaosRate } : {}), ...meta };
   state.cache = null;
   return g;
 }

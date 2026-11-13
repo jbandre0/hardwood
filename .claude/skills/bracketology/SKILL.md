@@ -46,8 +46,16 @@ Before writing anything, work out (in your head or in scratch notes):
 
 ## 2. Build the field (68)
 
+**Think like the selection committee, not a formula** (the commissioner's standing instruction). Ratings, the Board and
+quadrant counts are evidence, never the verdict, and never invent mechanical rules ("within X rating points, Y wins").
+For every close call put two résumés side by side and ask: which team would the room look at and say "yep, this team's
+better"? Weigh who they beat (and where), who they lost to, league record, how they're playing lately, and the eye test,
+together. A 17-7 team with three top-25 wins beats a 13-12 team with the same rating. Explain the close calls as
+comparisons in the article.
+
+
 - 31 automatic bids, one per conference: the team you project to win its conference tournament (before day 43:
-  usually the conference leader or the best team, your call, explain the close ones; after day 47: the actual
+  your judgment of the likeliest champion from standings, results, head-to-head and quality, explain the close ones; after day 47: the actual
   champion). Mark them `"bid": "Auto"`.
 - 37 at-large bids. Every other field team is `"bid": "At-large"`.
 - Seeds 1-16 in four regions: East, South, West, Midwest. Overall No. 1 seed goes to the East.

@@ -5,7 +5,7 @@ import { ncaaGames } from "./tournament.js";
 
 export const ROUND_POINTS = { 49: 10, 50: 20, 51: 40, 52: 80, 53: 160, 54: 320 };
 export const ROUND_NAMES = { 49: "Round of 64", 50: "Round of 32", 51: "Sweet 16", 52: "Elite Eight", 53: "Final Four", 54: "Championship" };
-export const MAX_POINTS = Object.entries(ROUND_POINTS).reduce((s, [d, p]) => s + p * ({ 49: 32, 50: 16, 51: 8, 52: 4, 53: 2, 54: 1 })[d], 0);   // 1,920 plus upset bonuses
+export const MAX_POINTS = Object.entries(ROUND_POINTS).reduce((s, [d, p]) => s + p * ({ 49: 32, 50: 16, 51: 8, 52: 4, 53: 2, 54: 1 })[d], 0);   // 1,920 (standard ESPN scoring, no bonuses)
 export const FIRST_PICK = 5814, PICK_COUNT = 63;      // round of 64 through the title game
 
 // First Four slots work like ESPN's "Michigan St./Texas A&M" line: from the round of 64 on, a First Four game's place in
@@ -63,10 +63,9 @@ export const ratingPicks = (field, rating) => { const r = slotRating(field, rati
 
 /**
  * Score one entry against the real games. actual = [{id, day, a, b, ptsA, ptsB}] (NCAA games, played or not).
- * Base points by round, plus an upset bonus (winner's seed minus loser's seed, when positive) for a correct pick.
+ * Standard ESPN scoring: points by round for each correct pick (10, 20, 40, 80, 160, 320), no bonuses.
  */
 export function scoreEntry(field, rawPicks, actual) {
-  const seed = seedMap(field);
   const winners = new Map(), eliminated = new Set(), dayOf = new Map();
   for (const g of actual) {
     dayOf.set(g.id, g.day);
@@ -75,17 +74,17 @@ export function scoreEntry(field, rawPicks, actual) {
   // a First Four slot stands for that game's winner once it's played (until then it's alive)
   const resolve = (t) => (isSlot(t) && winners.has(ffGameOfSlot(t)) ? winners.get(ffGameOfSlot(t)).w : t);
   const picks = {}; for (const [id, t] of Object.entries(slotify(field, rawPicks))) picks[id] = resolve(t);
-  const byRound = {}; for (const d of Object.keys(ROUND_POINTS)) byRound[d] = { day: +d, name: ROUND_NAMES[d], games: 0, decided: 0, correct: 0, points: 0, bonus: 0 };
-  let points = 0, bonus = 0, correct = 0, decided = 0, possible = 0;
+  const byRound = {}; for (const d of Object.keys(ROUND_POINTS)) byRound[d] = { day: +d, name: ROUND_NAMES[d], games: 0, decided: 0, correct: 0, points: 0 };
+  let points = 0, correct = 0, decided = 0, possible = 0;
   for (let id = FIRST_PICK; id <= 5876; id++) {
     const day = dayOf.get(id) ?? (id <= 5845 ? 49 : id <= 5861 ? 50 : id <= 5869 ? 51 : id <= 5873 ? 52 : id <= 5875 ? 53 : 54), r = byRound[day], pts = ROUND_POINTS[day], pick = picks[id];
     r.games++;
     if (winners.has(id)) {
       decided++; r.decided++;
       const res = winners.get(id);
-      if (pick === res.w) { const b = Math.max(0, (seed.get(res.w) ?? 0) - (seed.get(res.l) ?? 0)); points += pts; bonus += b; correct++; r.correct++; r.points += pts; r.bonus += b; }
+      if (pick === res.w) { points += pts; correct++; r.correct++; r.points += pts; }
     } else if (pick != null && !eliminated.has(pick)) possible += pts;
   }
   const champ = picks[5876] ?? null;
-  return { points, bonus, total: points + bonus, correct, decided, picked: Object.keys(picks).filter((id) => +id >= FIRST_PICK).length, maxRemaining: points + bonus + possible, possible, byRound, champion: champ, championAlive: champ != null && !eliminated.has(champ) };
+  return { points, total: points, correct, decided, picked: Object.keys(picks).filter((id) => +id >= FIRST_PICK).length, maxRemaining: points + possible, possible, byRound, champion: champ, championAlive: champ != null && !eliminated.has(champ) };
 }

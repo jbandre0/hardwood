@@ -49,8 +49,7 @@ test("scoring: a perfect bracket scores every point; scores add up round by roun
   assert.equal(perfect.correct, 63); assert.equal(perfect.decided, 63);
   const base = Object.entries({ 49: 32, 50: 16, 51: 8, 52: 4, 53: 2, 54: 1 }).reduce((s, [d, n]) => s + n * ROUND_POINTS[d], 0);
   assert.equal(perfect.points, base);
-  assert.equal(perfect.bonus, actual.filter((g) => g.ptsA != null && g.day >= 49).reduce((s, g) => { const w = real[g.id], l = w === g.a ? g.b : g.a, sd = new Map(field.map((f) => [f.team, f.seed])); return s + Math.max(0, sd.get(w) - sd.get(l)); }, 0));
-  assert.equal(perfect.total, perfect.points + perfect.bonus);
+  assert.equal(perfect.total, perfect.points, "no bonuses: the total is the round points");
   assert.equal(Object.values(perfect.byRound).reduce((s, r) => s + r.points, 0), perfect.points);
   assert.equal(perfect.byRound[54].correct, 1);
   const chalk = scoreEntry(field, chalkPicks(field, rating), actual);

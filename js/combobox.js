@@ -19,7 +19,8 @@ let uid = 0;
  */
 export function combobox(root, { id, options, value, onChange, searchable = true, placeholder = "Type to search" }) {
   const n = ++uid, listId = `cb-list-${n}`;
-  const opts = options.map((o, i) => ({ ...o, i, _s: norm(o.search || o.label), _n: norm(o.label) }));
+  // search the label AND the extra words (search used to replace the label, so a team list with search: conf couldn't find a team by name)
+  const opts = options.map((o, i) => ({ ...o, i, _s: norm(`${o.label} ${o.search || ""}`), _n: norm(o.label) }));
   let sel = opts.find((o) => o.value === value) || opts[0];
   let isOpen = false, hot = -1, shown = opts, typed = false;
 

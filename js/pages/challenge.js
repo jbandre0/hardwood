@@ -75,6 +75,9 @@ const REGIONS = ["East", "South", "West", "Midwest"];
         <div class="card" style="margin-top:14px"><div class="card-head"><h3 style="margin:0">First Four</h3><span class="muted">Day 48, Dayton</span></div><div class="grid cols-2" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${[5810, 5811, 5812, 5813].map(box).join("")}</div></div>`;
     }
 
+    // switching entries redraws the bracket further down the page: take the reader there so the switch is visible
+    const toBracket = () => { const el = document.querySelector(".chal"); if (el) window.scrollTo({ top: el.getBoundingClientRect().top + scrollY - 140, behavior: "smooth" }); };
+
     function draw() {
       history.replaceState(null, "", `?e=${viewKey}`);
       const e = E(viewKey), editable = e.mine && !locked, n = Object.keys(e.picks).length;
@@ -87,12 +90,12 @@ const REGIONS = ["East", "South", "West", "Midwest"];
         ${viewKey === "hq" && hq ? `<div class="card" style="margin-bottom:18px"><div class="card-head"><h2>${esc(hq.headline)}</h2><span class="pill mint">Bracketology HQ</span></div><div class="prose">${articleHTML(hq.writeup)}</div></div>` : ""}
         ${!locked ? `<div class="card" style="margin-bottom:18px"><div class="card-head"><h2>Your entries</h2><span class="muted">anyone on this device can file a bracket: add one per person</span></div>
           <div class="btn-row">${entries.filter((x) => x.mine).map((x) => `<button class="btn ${x.key === viewKey ? "" : "ghost"}" type="button" data-pick="${x.key}">${esc(x.name)} <span class="faint">(${Object.keys(x.picks).length}/67)</span></button>`).join("")}<button class="btn ghost" id="addEntry" type="button">+ Add entry</button>${e.mine ? '<button class="btn ghost" id="renameEntry" type="button">Rename</button>' : ""}${e.x ? '<button class="btn ghost" id="deleteEntry" type="button">Delete this entry</button>' : ""}</div></div>` : ""}
-        <div class="card" style="margin-bottom:18px"><div class="card-head"><h2>${esc(e.name)}${/s$/i.test(e.name) ? "'" : "'s"} bracket</h2><span class="muted">${n} of 67 picked${sc.decided ? ` &middot; ${sc.correct} of ${sc.decided} decided games right` : ""}</span></div>
+        <div class="card" style="margin-bottom:18px"><div class="card-head"><h2>${e.key === "you" && !ch.youName ? "Your bracket" : `${esc(e.name)}${/s$/i.test(e.name) ? "'" : "'s"} bracket`}</h2><span class="muted">${n} of 67 picked${sc.decided ? ` &middot; ${sc.correct} of ${sc.decided} decided games right` : ""}</span></div>
           ${editable ? `<div class="btn-row" style="margin-bottom:12px"><button class="btn ghost" id="fillChalk" type="button">Fill the rest with chalk</button><button class="btn ghost" id="fillRating" type="button">Fill the rest with ratings</button>${hq ? '<button class="btn ghost" id="copyHq" type="button">Start from HQ\'s bracket</button>' : ""}<button class="btn ghost" id="clear" type="button">Clear</button></div>` : e.mine && !n ? '<p class="muted">You didn\'t file a bracket before the tournament started.</p>' : ""}
           ${editable ? '<p class="faint" style="margin:0 0 10px;font-size:.82rem">Click a team to advance it. Changing an early pick clears the later picks that depended on it.</p>' : ""}
           <div class="chal ${editable ? "editable" : ""}">${bracket(e.picks, editable)}</div></div>`;
-      view.querySelectorAll("tr[data-e]").forEach((tr) => tr.onclick = () => { viewKey = tr.dataset.e; draw(); window.scrollTo({ top: document.querySelector(".chal").getBoundingClientRect().top + scrollY - 140, behavior: "smooth" }); });
-      view.querySelectorAll("[data-pick]").forEach((b) => b.onclick = () => { viewKey = b.dataset.pick; draw(); });
+      view.querySelectorAll("tr[data-e]").forEach((tr) => tr.onclick = () => { viewKey = tr.dataset.e; draw(); toBracket(); });
+      view.querySelectorAll("[data-pick]").forEach((b) => b.onclick = () => { viewKey = b.dataset.pick; draw(); toBracket(); });
       const add = view.querySelector("#addEntry");
       if (add) add.onclick = async () => {
         const name = (prompt("Name for the new entry (a friend, a nickname):") || "").trim().slice(0, 40);

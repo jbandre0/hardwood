@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readJSON, league } from "./util.mjs";
 import { loadSeasonData, createState, calc } from "../js/league/league.js";
-import { gamesFor, prunePicks, setPick, chalkPicks, ratingPicks, completePicks, scoreEntry, ROUND_POINTS } from "../js/league/challenge.js";
+import { gamesFor, prunePicks, setPick, chalkPicks, ratingPicks, completePicks, scoreEntry, ROUND_POINTS, seedMap, slotRating, isSlot, slotTeams } from "../js/league/challenge.js";
 
 const data = await loadSeasonData("season-1", async (p) => readJSON(p));
 const st = createState(data), c = calc(st), field = data.ncaa.field;
@@ -20,12 +20,12 @@ test("a full set of picks has 67 games, each pick is one of the two teams in its
 });
 
 test("chalk and rating brackets follow their rule; the champion is a 1 seed in chalk", () => {
-  const seed = new Map(field.map((f) => [f.team, f.seed]));
+  const seed = seedMap(field), rr = slotRating(field, rating);
   const p = chalkPicks(field, rating);
   for (const g of gamesFor(field, p)) { const w = p[g.id], l = w === g.a ? g.b : g.a; assert.ok(seed.get(w) <= seed.get(l), `game ${g.id}`); }
   assert.equal(seed.get(p[5876]), 1);
   const r = ratingPicks(field, rating);
-  for (const g of gamesFor(field, r)) { const w = r[g.id], l = w === g.a ? g.b : g.a; assert.ok(rating(w) >= rating(l)); }
+  for (const g of gamesFor(field, r)) { const w = r[g.id], l = w === g.a ? g.b : g.a; assert.ok(rr(w) >= rr(l)); }
 });
 
 test("changing an early pick removes the picks that depended on it, and only those", () => {
@@ -63,4 +63,30 @@ test("scoring: a perfect bracket scores every point; scores add up round by roun
   const s2 = scoreEntry(field, real, ff); assert.equal(s2.correct, 4); assert.equal(s2.maxRemaining, base);
   const wrong = { ...real, 5810: actual.find((g) => g.id === 5810).a === real[5810] ? actual.find((g) => g.id === 5810).b : actual.find((g) => g.id === 5810).a };
   assert.equal(scoreEntry(field, wrong, ff).correct, 3);
+});
+
+test("First Four slots: the whole bracket is pickable before the First Four is picked, and a slot pick scores as its winner", () => {
+  const games = gamesFor(field, {});
+  assert.equal(games.filter((g) => g.day === 49).length, 32, "every round-of-64 game exists with no picks at all");
+  const slotGames = games.filter((g) => g.day === 49 && (isSlot(g.a) || isSlot(g.b)));
+  assert.equal(slotGames.length, 4);
+  for (const g of slotGames) { const s = isSlot(g.a) ? g.a : g.b; assert.equal(slotTeams(field, s).length, 2); assert.equal(seedMap(field).get(s), seedMap(field).get(slotTeams(field, s)[0])); }
+  // advance one slot all the way to the title; it stays valid whatever the First Four pick is
+  const g = slotGames[0], slot = isSlot(g.a) ? g.a : g.b;
+  let p = completePicks(field, (a, b) => (a === slot ? a : b === slot ? b : a));
+  assert.equal(p[5876], slot);
+  const ffId = 5810 + (-slot) - 1, [t1, t2] = slotTeams(field, slot);
+  assert.equal(setPick(field, { ...p, [ffId]: t1 }, ffId, t2)[5876], slot, "changing the First Four pick keeps the slot's later picks");
+  // scoring: the slot is right when the real First Four winner wins
+  const ffWinner = real[ffId];
+  const s = scoreEntry(field, p, actual);
+  const byRound = (id) => actual.find((x) => x.id === id);
+  for (const [id, pick] of Object.entries(p)) if (pick === slot && +id >= 5814) {
+    const r = byRound(+id), w = r.ptsA > r.ptsB ? r.a : r.b;
+    if (w === ffWinner) assert.ok(s.correct > 0);
+  }
+  // picks saved the old way (a First Four team advanced by name) become the slot
+  const old = { [g.id]: ffWinner };
+  assert.equal(prunePicks(field, old)[g.id], slot);
+  assert.equal(scoreEntry(field, old, actual).correct, scoreEntry(field, { [g.id]: slot }, actual).correct);
 });

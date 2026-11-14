@@ -6,12 +6,31 @@ export const ROUND_POINTS = { 48: 5, 49: 10, 50: 20, 51: 40, 52: 80, 53: 160, 54
 export const ROUND_NAMES = { 48: "First Four", 49: "Round of 64", 50: "Round of 32", 51: "Sweet 16", 52: "Elite Eight", 53: "Final Four", 54: "Championship" };
 export const MAX_POINTS = Object.entries(ROUND_POINTS).reduce((s, [d, p]) => s + p * ({ 48: 4, 49: 32, 50: 16, 51: 8, 52: 4, 53: 2, 54: 1 })[d], 0);   // 1,900 plus upset bonuses
 
+// First Four slots work like ESPN's "Michigan St./Texas A&M" line: from the round of 64 on, a First Four game's place in
+// the bracket is the slot -g (g = the field's ff number, 1-4), meaning "whoever wins First Four game g". Picking the slot
+// is right when the actual winner of that game wins. The First Four games themselves are still picked team by team.
+export const FF_FIRST = 5810;
+export const isSlot = (t) => typeof t === "number" && t < 0;
+export const slotTeams = (field, t) => field.filter((f) => f.ff === -t).map((f) => f.team);
+const ffGameOfSlot = (t) => FF_FIRST - t - 1;          // slot -1 -> 5810 ... slot -4 -> 5813
+/** seed of a team or a First Four slot */
+export const seedMap = (field) => { const m = new Map(field.map((f) => [f.team, f.seed])); for (const f of field) if (f.ff) m.set(-f.ff, f.seed); return m; };
+/** a rating function that also rates a First Four slot (the better of its two teams) */
+export const slotRating = (field, rating) => (t) => (isSlot(t) ? Math.max(...slotTeams(field, t).map(rating)) : rating(t));
+
 /** the games that exist given a set of picks (teams known from the field and the picked winners) */
-export const gamesFor = (field, picks) => ncaaGames(field, (id) => picks[id]);
+export const gamesFor = (field, picks) => ncaaGames(field, (id) => (id >= FF_FIRST && id < FF_FIRST + 4 ? -(id - FF_FIRST + 1) : picks[id]));
+
+/** picks saved before slots existed advanced a First Four team by name: turn those into its slot */
+function slotify(field, picks) {
+  const ff = new Map(field.filter((f) => f.ff).map((f) => [f.team, f.ff])), out = {};
+  for (const [id, t] of Object.entries(picks)) out[id] = +id >= FF_FIRST + 4 && ff.has(t) ? -ff.get(t) : t;
+  return out;
+}
 
 /** drop picks that no longer make sense (their game isn't set up, or the picked team isn't in it), until stable */
 export function prunePicks(field, picks) {
-  const out = { ...picks };
+  const out = slotify(field, picks);
   for (let guard = 0; guard < 10; guard++) {
     const byId = new Map(gamesFor(field, out).map((g) => [g.id, g]));
     let changed = false;
@@ -35,22 +54,25 @@ export function completePicks(field, better, base = {}) {
   return picks;
 }
 export const chalkPicks = (field, rating) => {
-  const seed = new Map(field.map((f) => [f.team, f.seed]));
-  return completePicks(field, (a, b) => (seed.get(a) !== seed.get(b) ? (seed.get(a) < seed.get(b) ? a : b) : rating(a) >= rating(b) ? a : b));
+  const seed = seedMap(field), r = slotRating(field, rating);
+  return completePicks(field, (a, b) => (seed.get(a) !== seed.get(b) ? (seed.get(a) < seed.get(b) ? a : b) : r(a) >= r(b) ? a : b));
 };
-export const ratingPicks = (field, rating) => completePicks(field, (a, b) => (rating(a) >= rating(b) ? a : b));
+export const ratingPicks = (field, rating) => { const r = slotRating(field, rating); return completePicks(field, (a, b) => (r(a) >= r(b) ? a : b)); };
 
 /**
  * Score one entry against the real games. actual = [{id, day, a, b, ptsA, ptsB}] (NCAA games, played or not).
  * Base points by round, plus an upset bonus (winner's seed minus loser's seed, when positive) for a correct pick.
  */
-export function scoreEntry(field, picks, actual) {
-  const seed = new Map(field.map((f) => [f.team, f.seed]));
+export function scoreEntry(field, rawPicks, actual) {
+  const seed = seedMap(field);
   const winners = new Map(), eliminated = new Set(), dayOf = new Map();
   for (const g of actual) {
     dayOf.set(g.id, g.day);
     if (g.ptsA != null) { const w = g.ptsA > g.ptsB ? g.a : g.b, l = w === g.a ? g.b : g.a; winners.set(g.id, { w, l }); eliminated.add(l); }
   }
+  // a First Four slot stands for that game's winner once it's played (until then it's alive)
+  const resolve = (t) => (isSlot(t) && winners.has(ffGameOfSlot(t)) ? winners.get(ffGameOfSlot(t)).w : t);
+  const picks = {}; for (const [id, t] of Object.entries(slotify(field, rawPicks))) picks[id] = resolve(t);
   const byRound = {}; for (const d of Object.keys(ROUND_POINTS)) byRound[d] = { day: +d, name: ROUND_NAMES[d], games: 0, decided: 0, correct: 0, points: 0, bonus: 0 };
   let points = 0, bonus = 0, correct = 0, decided = 0, possible = 0;
   for (let id = 5810; id <= 5876; id++) {

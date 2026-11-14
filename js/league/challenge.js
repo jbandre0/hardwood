@@ -1,14 +1,16 @@
-// Bracket challenge: fill in all 67 games of the NCAA bracket before it starts, scored as it plays.
-// Picks are keyed by the real game id (5810-5876), so a pick is right when the real winner of that game is the pick.
+// Bracket challenge: fill in the 63 games from the round of 64 on before it starts, scored as it plays. Like ESPN, the
+// First Four isn't picked or scored: each play-in game is a slot ("Michigan St. / Texas A&M") in the round of 64.
+// Picks are keyed by the real game id (5814-5876), so a pick is right when the real winner of that game is the pick.
 import { ncaaGames } from "./tournament.js";
 
-export const ROUND_POINTS = { 48: 5, 49: 10, 50: 20, 51: 40, 52: 80, 53: 160, 54: 320 };
-export const ROUND_NAMES = { 48: "First Four", 49: "Round of 64", 50: "Round of 32", 51: "Sweet 16", 52: "Elite Eight", 53: "Final Four", 54: "Championship" };
-export const MAX_POINTS = Object.entries(ROUND_POINTS).reduce((s, [d, p]) => s + p * ({ 48: 4, 49: 32, 50: 16, 51: 8, 52: 4, 53: 2, 54: 1 })[d], 0);   // 1,900 plus upset bonuses
+export const ROUND_POINTS = { 49: 10, 50: 20, 51: 40, 52: 80, 53: 160, 54: 320 };
+export const ROUND_NAMES = { 49: "Round of 64", 50: "Round of 32", 51: "Sweet 16", 52: "Elite Eight", 53: "Final Four", 54: "Championship" };
+export const MAX_POINTS = Object.entries(ROUND_POINTS).reduce((s, [d, p]) => s + p * ({ 49: 32, 50: 16, 51: 8, 52: 4, 53: 2, 54: 1 })[d], 0);   // 1,920 plus upset bonuses
+export const FIRST_PICK = 5814, PICK_COUNT = 63;      // round of 64 through the title game
 
 // First Four slots work like ESPN's "Michigan St./Texas A&M" line: from the round of 64 on, a First Four game's place in
 // the bracket is the slot -g (g = the field's ff number, 1-4), meaning "whoever wins First Four game g". Picking the slot
-// is right when the actual winner of that game wins. The First Four games themselves are still picked team by team.
+// is right when the actual winner of that game wins.
 export const FF_FIRST = 5810;
 export const isSlot = (t) => typeof t === "number" && t < 0;
 export const slotTeams = (field, t) => field.filter((f) => f.ff === -t).map((f) => f.team);
@@ -19,7 +21,7 @@ export const seedMap = (field) => { const m = new Map(field.map((f) => [f.team, 
 export const slotRating = (field, rating) => (t) => (isSlot(t) ? Math.max(...slotTeams(field, t).map(rating)) : rating(t));
 
 /** the games that exist given a set of picks (teams known from the field and the picked winners) */
-export const gamesFor = (field, picks) => ncaaGames(field, (id) => (id >= FF_FIRST && id < FF_FIRST + 4 ? -(id - FF_FIRST + 1) : picks[id]));
+export const gamesFor = (field, picks) => ncaaGames(field, (id) => (id >= FF_FIRST && id < FF_FIRST + 4 ? -(id - FF_FIRST + 1) : picks[id])).filter((g) => g.id >= FIRST_PICK);
 
 /** picks saved before slots existed advanced a First Four team by name: turn those into its slot */
 function slotify(field, picks) {
@@ -75,8 +77,8 @@ export function scoreEntry(field, rawPicks, actual) {
   const picks = {}; for (const [id, t] of Object.entries(slotify(field, rawPicks))) picks[id] = resolve(t);
   const byRound = {}; for (const d of Object.keys(ROUND_POINTS)) byRound[d] = { day: +d, name: ROUND_NAMES[d], games: 0, decided: 0, correct: 0, points: 0, bonus: 0 };
   let points = 0, bonus = 0, correct = 0, decided = 0, possible = 0;
-  for (let id = 5810; id <= 5876; id++) {
-    const day = dayOf.get(id) ?? (id <= 5813 ? 48 : id <= 5845 ? 49 : id <= 5861 ? 50 : id <= 5869 ? 51 : id <= 5873 ? 52 : id <= 5875 ? 53 : 54), r = byRound[day], pts = ROUND_POINTS[day], pick = picks[id];
+  for (let id = FIRST_PICK; id <= 5876; id++) {
+    const day = dayOf.get(id) ?? (id <= 5845 ? 49 : id <= 5861 ? 50 : id <= 5869 ? 51 : id <= 5873 ? 52 : id <= 5875 ? 53 : 54), r = byRound[day], pts = ROUND_POINTS[day], pick = picks[id];
     r.games++;
     if (winners.has(id)) {
       decided++; r.decided++;
@@ -85,5 +87,5 @@ export function scoreEntry(field, rawPicks, actual) {
     } else if (pick != null && !eliminated.has(pick)) possible += pts;
   }
   const champ = picks[5876] ?? null;
-  return { points, bonus, total: points + bonus, correct, decided, picked: Object.keys(picks).length, maxRemaining: points + bonus + possible, possible, byRound, champion: champ, championAlive: champ != null && !eliminated.has(champ) };
+  return { points, bonus, total: points + bonus, correct, decided, picked: Object.keys(picks).filter((id) => +id >= FIRST_PICK).length, maxRemaining: points + bonus + possible, possible, byRound, champion: champ, championAlive: champ != null && !eliminated.has(champ) };
 }

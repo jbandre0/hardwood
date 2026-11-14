@@ -188,7 +188,7 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
       if (v.errors.length) { document.getElementById("status").textContent = "Could not build a valid field: " + v.errors[0]; return; }
       setContent(state, "field", picks.filter((p) => p.group === "Field").map((p) => ({ team: p.team, seed: p.seed, region: p.region, ff: p.ff })));
       syncTournament(state); await persist(); await render();
-      const st2 = document.getElementById("status"); if (st2) st2.innerHTML = 'NCAA field set. First Four is day 48. <a href="challenge.html" style="color:var(--accent)">The bracket challenge is open</a>: fill yours in before day 48 is played.';
+      const st2 = document.getElementById("status"); if (st2) st2.innerHTML = 'NCAA field set. First Four is day 48. <a href="challenge.html" style="color:var(--accent)">The bracket challenge is open</a>: fill yours in before the round of 64 (day 49) is played.';
     });
     document.getElementById("playDay")?.addEventListener("click", async () => {
       busy(true, `Playing day ${nextDay}…`);

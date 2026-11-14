@@ -123,18 +123,20 @@ When the export has an `ncaaField` (the commissioner built the 68-team field aft
 exists yet for the season in `data/challenge.json`, file one the same session. It is part of the product: the
 commissioner fills out their own bracket against yours, and the site scores both as the tournament plays.
 
-- Pick all 67 games (First Four 5810-5813, round of 64 5814-5845, round of 32 5846-5861, Sweet 16 5862-5869, Elite Eight
+- Pick all 63 games (round of 64 5814-5845, round of 32 5846-5861, Sweet 16 5862-5869, Elite Eight
   5870-5873, Final Four 5874-5875, championship 5876). Reason it like a human: matchups, résumés, style, injuries to
-  the narrative, a couple of upsets you'd defend, a champion with a case. No simulations.
+  the narrative, a couple of upsets you'd defend, a champion with a case. No simulations. Like ESPN, the First Four (5810-5813) is not picked or
+  scored: a play-in game sits in the round of 64 as one slot, written "First Four 1" to "First Four 4" (the field's `ff`
+  number), meaning whoever wins it.
 - Write 500-900 words ("writeup"): the champion and why, the upsets you picked (and the ones you resisted), the region
   you think is the toughest, one bold Final Four. Same voice and rules as the weekly column, no em dashes.
-- Draft file: `{ "season": "season-2", "headline": "...", "writeup": "...", "winners": { "5810": "Team Name", ... all 67 } }`
+- Draft file: `{ "season": "season-2", "headline": "...", "writeup": "...", "winners": { "5814": "Team Name", ... all 63 } }`
 ```bash
 node tools/publish_challenge.mjs <scratch>/challenge.json --export <export.json> --dry-run
 node tools/publish_challenge.mjs <scratch>/challenge.json --export <export.json>      # add --replace only if asked to redo it
 ```
 Commit `data/challenge.json` with the edition (message: `Bracket challenge: Season 2 HQ bracket`). The Bracket Challenge
-page shows HQ's entry on the leaderboard with the writeup. File it BEFORE day 48 is played; after that entries are locked.
+page shows HQ's entry on the leaderboard with the writeup. File it BEFORE day 49 (the round of 64) is played; after that entries are locked.
 
 ## 5. Report back
 

@@ -28,6 +28,25 @@ const LABELS = ["First Round", "Second Round", "Sweet 16", "Elite Eight"];
       return `<div class="game" title="Day ${g.day} · ${esc(ROUND_BY_DAY[g.day])}">${team(g.a, g.ptsA, g.w === g.a, g.w === g.a && up)}${team(g.b, g.ptsB, g.w === g.b, g.w === g.b && up)}</div>`;
     };
 
+    // a first-round game that waits on a First Four winner doesn't exist yet: show the known team and the two it waits on
+    const field = core.ncaa.field || [];
+    const ffWinner = (g) => { const w = ncaa.find((x) => x.day === 48 && x.ptsA != null && field.some((f) => f.ff === g && (f.team === x.a || f.team === x.b))); return w ? w.w : null; };
+    const pendingBox = (R, k) => {
+      const side = (sd) => {
+        const direct = field.find((f) => f.region === R && f.seed === sd && !f.ff);
+        if (direct) return team(direct.team, null, false, false).replace('class="tm lose', 'class="tm');
+        const pair = field.filter((f) => f.region === R && f.seed === sd && f.ff);
+        if (!pair.length) return `<div class="tm"><span class="sd"></span><span class="nm faint">TBD</span><span class="pts"></span></div>`;
+        const won = ffWinner(pair[0].ff);
+        if (won != null) return team(won, null, false, false).replace('class="tm lose', 'class="tm');
+        const names = pair.map((f) => teams[f.team].name).join(" / ");
+        return `<div class="tm" title="First Four winner: ${esc(names)}"><span class="sd">${sd}</span><span class="nm faint">${esc(names)}</span><span class="pts"></span></div>`;
+      };
+      const [s1, s2] = PAIRS[k];
+      if (!field.some((f) => f.region === R && (f.seed === s1 || f.seed === s2))) return gameBox(null);
+      return `<div class="game" title="Day 49 · waiting on the First Four">${side(s1)}${side(s2)}</div>`;
+    };
+
     function regionHTML(R, flip) {
       const rg = ncaa.filter((g) => g.ctx === R && g.day >= 49 && g.day <= 52);
       const r64 = rg.filter((g) => g.day === 49);
@@ -46,7 +65,7 @@ const LABELS = ["First Round", "Second Round", "Sweet 16", "Elite Eight"];
         cols.push(arr);
       }
       const colHTML = cols.map((arr, ci) => {
-        const boxes = arr.map(gameBox);
+        const boxes = arr.map((g, k) => (ci === 0 && !g ? pendingBox(R, k) : gameBox(g)));
         if (ci === 3) return `<div class="round">${boxes.join("")}</div>`;
         const pairs = [];
         for (let i = 0; i < boxes.length; i += 2) pairs.push(`<div class="pair">${boxes[i]}${boxes[i + 1]}</div>`);

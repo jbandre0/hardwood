@@ -28,21 +28,24 @@ const REGIONS = ["East", "South", "West", "Midwest"];
     // bots use the ratings going into the tournament, so they never change once it starts
     const pre = statsAsOf(state, 47), rating = (id) => (pre[id].GP ? pre[id].rating : pre[id].tierRating);
     const entries = [];
-    const mine = state.content.challenge && state.content.challenge.you;
-    entries.push({ key: "you", name: "You", picks: mine ? mine.picks : {}, mine: true });
+    const ch = state.content.challenge || {}, mine = ch.you;
+    const extras = () => ch.extra || (ch.extra = []);   // more human entries (a friend on the same couch): [{id, name, picks}]
+    entries.push({ key: "you", name: ch.youName || "You", picks: mine ? mine.picks : {}, mine: true });
+    for (const x of extras()) entries.push({ key: "x" + x.id, name: x.name, picks: x.picks || {}, mine: true, x });
     if (hq) entries.push({ key: "hq", name: "Bracketology HQ", picks: hq.picks });
     entries.push({ key: "chalk", name: "Chalk (bot)", picks: chalkPicks(field, rating) });
     entries.push({ key: "rating", name: "Power ratings (bot)", picks: ratingPicks(field, rating) });
     let viewKey = new URLSearchParams(location.search).get("e") || "you";
     if (!entries.some((e) => e.key === viewKey)) viewKey = "you";
-    if (locked && !new URLSearchParams(location.search).get("e") && !Object.keys(entries[0].picks).length) viewKey = entries[1].key;   // nothing of yours to show: start on the next entry
+    if (locked && !new URLSearchParams(location.search).get("e") && !Object.keys(entries[0].picks).length) viewKey = (entries.find((e) => !e.mine) || entries[0]).key;   // nothing of yours to show: start on the next entry
     const persist = async () => { await saveOverlay(season.id, toOverlay(state)); };
+    const saveChallenge = async () => { setContent(state, "challenge", { ...ch }); await persist(); };
     const E = (k) => entries.find((e) => e.key === k);
 
     function leaderboard() {
-      const rows = entries.filter((e) => e.key !== "you" || Object.keys(e.picks).length).map((e) => ({ e, s: scoreEntry(field, e.picks, actual) })).sort((a, b) => b.s.total - a.s.total || b.s.maxRemaining - a.s.maxRemaining);
+      const rows = entries.filter((e) => !e.mine || Object.keys(e.picks).length).map((e) => ({ e, s: scoreEntry(field, e.picks, actual) })).sort((a, b) => b.s.total - a.s.total || b.s.maxRemaining - a.s.maxRemaining);
       return `<div class="table-wrap"><table><thead><tr><th class="c">#</th><th>Entry</th><th class="r">Points</th><th class="r">Upset bonus</th><th class="r">Total</th><th class="r">Right</th><th class="r">Still possible</th><th>Champion pick</th></tr></thead><tbody>
-        ${rows.map(({ e, s }, i) => `<tr class="clickable ${e.key === viewKey ? "on-deck" : ""}" data-e="${e.key}"><td class="rank c">${locked || s.decided ? i + 1 : "—"}</td><td><b>${esc(e.name)}</b>${e.mine ? ' <span class="pill mint">you</span>' : ""}</td><td class="r num">${s.points}</td><td class="r num muted">${s.bonus ? "+" + s.bonus : "0"}</td><td class="r num"><b>${s.total}</b></td><td class="r num">${s.correct}/${s.decided}</td><td class="r num ${s.decided && s.maxRemaining < s.total ? "down" : "muted"}">${s.picked >= 67 ? s.maxRemaining : "—"}</td>
+        ${rows.map(({ e, s }, i) => `<tr class="clickable ${e.key === viewKey ? "on-deck" : ""}" data-e="${e.key}"><td class="rank c">${locked || s.decided ? i + 1 : "—"}</td><td><b>${esc(e.name)}</b>${e.mine ? ` <span class="pill mint">${e.x ? "entry" : "you"}</span>` : ""}</td><td class="r num">${s.points}</td><td class="r num muted">${s.bonus ? "+" + s.bonus : "0"}</td><td class="r num"><b>${s.total}</b></td><td class="r num">${s.correct}/${s.decided}</td><td class="r num ${s.decided && s.maxRemaining < s.total ? "down" : "muted"}">${s.picked >= 67 ? s.maxRemaining : "—"}</td>
         <td>${s.champion != null ? `${esc(teams[s.champion].name)} <span class="faint">(${seedOf.get(s.champion)})</span>${s.decided && !s.championAlive ? ' <span class="pill warm">out</span>' : ""}` : '<span class="faint">none yet</span>'}</td></tr>`).join("")}
         </tbody></table></div>`;
     }
@@ -81,13 +84,38 @@ const REGIONS = ["East", "South", "West", "Midwest"];
         <div class="card" style="margin-bottom:18px"><div class="card-head"><h2>Leaderboard</h2><span class="muted">click an entry to see its bracket</span></div>${leaderboard()}
           <p class="faint" style="margin:10px 0 0;font-size:.82rem">The bots use the power ratings going into the tournament: Chalk always takes the better seed (ratings break ties), Power ratings always takes the better rating. Possible = points still available from picks whose team is alive.</p></div>
         ${viewKey === "hq" && hq ? `<div class="card" style="margin-bottom:18px"><div class="card-head"><h2>${esc(hq.headline)}</h2><span class="pill mint">Bracketology HQ</span></div><div class="prose">${articleHTML(hq.writeup)}</div></div>` : ""}
-        <div class="card" style="margin-bottom:18px"><div class="card-head"><h2>${esc(e.name)}'s bracket</h2><span class="muted">${n} of 67 picked${sc.decided ? ` &middot; ${sc.correct} of ${sc.decided} decided games right` : ""}</span></div>
+        ${!locked ? `<div class="card" style="margin-bottom:18px"><div class="card-head"><h2>Your entries</h2><span class="muted">anyone on this device can file a bracket: add one per person</span></div>
+          <div class="btn-row">${entries.filter((x) => x.mine).map((x) => `<button class="btn ${x.key === viewKey ? "" : "ghost"}" type="button" data-pick="${x.key}">${esc(x.name)} <span class="faint">(${Object.keys(x.picks).length}/67)</span></button>`).join("")}<button class="btn ghost" id="addEntry" type="button">+ Add entry</button>${e.mine ? '<button class="btn ghost" id="renameEntry" type="button">Rename</button>' : ""}${e.x ? '<button class="btn ghost" id="deleteEntry" type="button">Delete this entry</button>' : ""}</div></div>` : ""}
+        <div class="card" style="margin-bottom:18px"><div class="card-head"><h2>${esc(e.name)}${/s$/i.test(e.name) ? "'" : "'s"} bracket</h2><span class="muted">${n} of 67 picked${sc.decided ? ` &middot; ${sc.correct} of ${sc.decided} decided games right` : ""}</span></div>
           ${editable ? `<div class="btn-row" style="margin-bottom:12px"><button class="btn ghost" id="fillChalk" type="button">Fill the rest with chalk</button><button class="btn ghost" id="fillRating" type="button">Fill the rest with ratings</button>${hq ? '<button class="btn ghost" id="copyHq" type="button">Start from HQ\'s bracket</button>' : ""}<button class="btn ghost" id="clear" type="button">Clear</button></div>` : e.mine && !n ? '<p class="muted">You didn\'t file a bracket before the tournament started.</p>' : ""}
           ${editable ? '<p class="faint" style="margin:0 0 10px;font-size:.82rem">Click a team to advance it. Changing an early pick clears the later picks that depended on it.</p>' : ""}
           <div class="chal ${editable ? "editable" : ""}">${bracket(e.picks, editable)}</div></div>`;
       view.querySelectorAll("tr[data-e]").forEach((tr) => tr.onclick = () => { viewKey = tr.dataset.e; draw(); window.scrollTo({ top: document.querySelector(".chal").getBoundingClientRect().top + scrollY - 140, behavior: "smooth" }); });
+      view.querySelectorAll("[data-pick]").forEach((b) => b.onclick = () => { viewKey = b.dataset.pick; draw(); });
+      const add = view.querySelector("#addEntry");
+      if (add) add.onclick = async () => {
+        const name = (prompt("Name for the new entry (a friend, a nickname):") || "").trim().slice(0, 40);
+        if (!name) return;
+        const id = Date.now().toString(36); extras().push({ id, name, picks: {}, savedAt: new Date().toISOString() });
+        await saveChallenge(); location.search = `?e=x${id}`;
+      };
+      const ren = view.querySelector("#renameEntry");
+      if (ren) ren.onclick = async () => {
+        const name = (prompt("Rename this entry:", e.name) || "").trim().slice(0, 40); if (!name) return;
+        if (e.x) e.x.name = name; else ch.youName = name;
+        await saveChallenge(); location.reload();
+      };
+      const del = view.querySelector("#deleteEntry");
+      if (del) del.onclick = async () => {
+        if (!confirm(`Delete ${e.name}'s entry and its picks?`)) return;
+        ch.extra = extras().filter((x) => x !== e.x); await saveChallenge(); location.search = "?e=you";
+      };
       if (editable) {
-        const save = async (p) => { e.picks = p; setContent(state, "challenge", { ...(state.content.challenge || {}), you: { picks: p, savedAt: new Date().toISOString() } }); await persist(); draw(); };
+        const save = async (p) => {
+          e.picks = p;
+          if (e.x) e.x.picks = p; else ch.you = { picks: p, savedAt: new Date().toISOString() };
+          await saveChallenge(); draw();
+        };
         view.querySelectorAll("button.pickable").forEach((b) => b.onclick = () => save(setPick(field, e.picks, +b.dataset.g, +b.dataset.t)));
         view.querySelector("#fillChalk").onclick = () => save(completePicks(field, (a, b) => (seedOf.get(a) !== seedOf.get(b) ? (seedOf.get(a) < seedOf.get(b) ? a : b) : rating(a) >= rating(b) ? a : b), e.picks));
         view.querySelector("#fillRating").onclick = () => save(completePicks(field, (a, b) => (rating(a) >= rating(b) ? a : b), e.picks));

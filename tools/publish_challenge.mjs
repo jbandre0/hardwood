@@ -21,7 +21,11 @@ const byNorm = new Map(league.map((t) => [norm(t.name), t.id]));
 const idOf = (n) => { if (typeof n === "number") return n; const id = byNorm.get(norm(n)); if (id == null) errors.push(`Unknown team "${n}"`); return id; };
 const season = draft.season || X.season.id;
 if (season !== X.season.id) errors.push(`Draft is for ${season} but the export is ${X.season.id}`);
-const field = X.ncaaField;
+// The committee's official field published to the repo (data/seasons/<season>/ncaa.json, "official": true) wins over the
+// export's field, the same way the site adopts it over a field built in the browser.
+const officialPath = path.join(ROOT, `data/seasons/${draft.season}/ncaa.json`);
+const official = fs.existsSync(officialPath) ? JSON.parse(fs.readFileSync(officialPath, "utf8")) : null;
+const field = official && official.official && official.field && official.field.length === 68 ? official.field : X.ncaaField;
 if (!field || field.length !== 68) errors.push("The NCAA field isn't set in this export yet (Commissioner desk: Build NCAA field after day 47), so there is no bracket to fill in.");
 const picks = {};
 for (const [id, name] of Object.entries(draft.winners || {})) picks[+id] = idOf(name);

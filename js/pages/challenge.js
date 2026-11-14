@@ -3,7 +3,7 @@ import { loadCore, resetCores, esc, badge } from "../data.js";
 import { setContent, toOverlay } from "../league/league.js";
 import { saveOverlay } from "../league/store.js";
 import { statsAsOf } from "../league/insights.js";
-import { gamesFor, setPick, completePicks, chalkPicks, ratingPicks, scoreEntry, ROUND_POINTS, ROUND_NAMES } from "../league/challenge.js";
+import { gamesFor, prunePicks, setPick, completePicks, chalkPicks, ratingPicks, scoreEntry, ROUND_POINTS, ROUND_NAMES } from "../league/challenge.js";
 import { articleHTML } from "../data.js";
 
 const REGIONS = ["East", "South", "West", "Midwest"];
@@ -30,8 +30,9 @@ const REGIONS = ["East", "South", "West", "Midwest"];
     const entries = [];
     const ch = state.content.challenge || {}, mine = ch.you;
     const extras = () => ch.extra || (ch.extra = []);   // more human entries (a friend on the same couch): [{id, name, picks}]
-    entries.push({ key: "you", name: ch.youName || "You", picks: mine ? mine.picks : {}, mine: true });
-    for (const x of extras()) entries.push({ key: "x" + x.id, name: x.name, picks: x.picks || {}, mine: true, x });
+    // picks made against an older field (before the official one replaced it) drop the games that no longer exist
+    entries.push({ key: "you", name: ch.youName || "You", picks: mine ? prunePicks(field, mine.picks) : {}, mine: true });
+    for (const x of extras()) entries.push({ key: "x" + x.id, name: x.name, picks: prunePicks(field, x.picks || {}), mine: true, x });
     if (hq) entries.push({ key: "hq", name: "Bracketology HQ", picks: hq.picks });
     entries.push({ key: "chalk", name: "Chalk (bot)", picks: chalkPicks(field, rating) });
     entries.push({ key: "rating", name: "Power ratings (bot)", picks: ratingPicks(field, rating) });

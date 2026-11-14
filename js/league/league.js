@@ -249,11 +249,27 @@ export function setContent(state, key, value) {
 
 
 /**
+ * The committee's official field (a baseline ncaa.json with "official": true, published to the repo after Selection
+ * Sunday) replaces a field built in the browser, as long as no NCAA game has been played yet. Once the tournament is
+ * under way the field in use is never swapped.
+ */
+export function adoptOfficialField(state) {
+  const pub = state.data.ncaa;
+  if (!pub || !pub.official || !pub.field || pub.field.length !== 68) return false;
+  if (state.games.some((g) => g.type === "NCAA" && g.ptsA != null)) return false;
+  const key = (f) => f.map((x) => `${x.team}|${x.seed}|${x.region}|${x.ff || 0}`).sort().join(",");
+  if (state.content.field && key(state.content.field) === key(pub.field)) return false;
+  setContent(state, "field", pub.field.map((x) => ({ team: x.team, seed: x.seed, region: x.region, ff: x.ff || null })));
+  return true;
+}
+
+/**
  * Keep the generated tournament games in step with the results: conference tournaments once the regular season is
  * finished, the NCAA tournament once every conference tournament is done and a field exists (content.field, or the
  * baseline ncaa.json). Generated games that are unplayed and no longer valid are dropped. Baseline games are never touched.
  */
 export function syncTournament(state) {
+  adoptOfficialField(state);
   const want = new Map();                                   // id -> row
   const regDone = !state.games.some((g) => (g.type === "Reg" || g.type === "Conf") && g.ptsA == null);
   const teams = state.data.teams, confs = [...new Set(Object.values(teams).map((t) => t.conf))].sort((a, b) => a.localeCompare(b));
@@ -278,7 +294,8 @@ export function syncTournament(state) {
   // drop stale generated games that are unplayed, add the missing ones
   for (const row of state.extraGames.slice()) {
     const g = state.byId.get(row[0]);
-    if (g && g.ptsA == null && !want.has(row[0]) && (g.type === "CT" || g.type === "NCAA")) {
+    const w = want.get(row[0]), changed = w && (w[3] !== g?.ctx || w[4] !== g?.a || w[5] !== g?.b);   // same game id, different teams (the field changed)
+    if (g && g.ptsA == null && (!w || changed) && (g.type === "CT" || g.type === "NCAA")) {
       state.games.splice(state.games.indexOf(g), 1); state.byId.delete(g.id); state.extraGames.splice(state.extraGames.indexOf(row), 1); state.cache = null;
     }
   }

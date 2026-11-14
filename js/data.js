@@ -6,7 +6,9 @@ import { buildFreshSeason1, FRESH_FILES } from "./league/fresh.js";
 
 const cache = new Map();
 export function fetchJSON(path) {
-  if (!cache.has(path)) cache.set(path, fetch(path).then((r) => {
+  // "no-cache" = always ask the server whether the file changed (a cheap 304 when it hasn't), so a newly published
+  // edition or backup shows up on the next page load instead of after GitHub Pages' 10-minute cache expires
+  if (!cache.has(path)) cache.set(path, fetch(path, { cache: "no-cache" }).then((r) => {
     if (!r.ok) throw new Error(`Could not load ${path} (${r.status})`);
     return r.json();
   }));

@@ -69,7 +69,10 @@ export function createState(data, overlay = null) {
 
 /**
  * Published editions win for their weeks: their field replaces that week's picks, their article replaces that week's
- * bracketology article, their AP ballot (if any) replaces that week's ballot. Not marked dirty: they live in the repo.
+ * bracketology article. Not marked dirty: they live in the repo.
+ * The AP ballot is the commissioner's alone: an edition never touches it. (Editions used to carry HQ's ballot, `hqAp`,
+ * and it overwrote the commissioner's. Where an edition has `apRestore`, the commissioner's own ballot recovered from
+ * their export, it is put back, but only while the stored ballot is still exactly HQ's, so a later vote is never undone.)
  */
 export function applyEditions(state, editions) {
   const C = state.content;
@@ -77,7 +80,13 @@ export function applyEditions(state, editions) {
     C.picks = [...C.picks.filter((p) => p.week !== e.week), ...e.picks.map((p) => ({ ...p, week: e.week }))];
     C.articles = [...C.articles.filter((a) => !((!a.type || /bracket/i.test(a.type)) && a.week === e.week)),
       { type: "Bracketology", week: e.week, heading: e.week === 0 ? "Preseason" : `Week ${e.week}`, headline: e.headline, body: e.body, to: e.afterDay, publishedAt: e.publishedAt, edition: true }];
-    if (e.ap && e.ap.length) C.ap = [...C.ap.filter((b) => b.week !== e.week), { week: e.week, afterDay: e.afterDay, ranks: e.ap.slice() }].sort((a, b) => a.week - b.week);
+    if (e.apRestore && e.hqAp) {
+      const cur = C.ap.find((b) => b.week === e.week);
+      if (cur && cur.ranks.length === e.hqAp.length && cur.ranks.every((id, i) => id === e.hqAp[i])) {
+        C.ap = C.ap.map((b) => (b === cur ? { ...b, ranks: e.apRestore.slice() } : b));
+        if (state.contentDirty) state.contentDirty.add("ap");
+      }
+    }
     if (e.commAdj) C.commAdj = [...C.commAdj.filter((a) => a.week !== e.week), ...e.commAdj.map((a) => ({ ...a, week: e.week }))];
   }
 }

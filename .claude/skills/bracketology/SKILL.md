@@ -1,6 +1,6 @@
 ---
 name: bracketology
-description: Write and publish the weekly Hardwood Sim bracketology edition (projected 68-team field, bubble, optional AP ballot, and a long feature article) from the commissioner's season export, then push it live to the site. Use when the commissioner says "do bracketology", "bracketology week", "new edition", or attaches a hardwood-*-through-day-*.json export.
+description: Write and publish the weekly Hardwood Sim bracketology edition (projected 68-team field, bubble and a feature article) from the commissioner's season export, then push it live to the site. Use when the commissioner says "do bracketology", "bracketology week", "new edition", or attaches a hardwood-*-through-day-*.json export.
 ---
 
 # Weekly bracketology for Hardwood Sim
@@ -62,9 +62,16 @@ comparisons in the article.
 - First Four: two games on the 11 line (the last four at-large teams in) and two on the 16 line (the four weakest
   automatic bids). Both teams of a First Four game share seed and region; give them `"ff": 1..4`
   (1-2 = 11 line, 3-4 = 16 line). Every other team has `"ff": null`.
+- Seed every team where its résumé belongs, automatic bids included (the commissioner's rule). A strong mid-major
+  champion (an unbeaten New Mexico State, a 10-1 East Tennessee State) can sit on the 6 or 9 line, and that can push
+  at-large teams onto the 12 line or lower. That's allowed. The last four in are still the four weakest at-large
+  teams, and they still play the First Four on the 11 line, even though that's a better seed number than an at-large
+  12: playing an extra game is the worse deal. Never bury a mid-major champion on the 12 line just to keep
+  at-large teams above it.
 - Keep a conference's top teams in different regions where you can.
 - Bubble: `firstFourOut` (4 names) and `nextFourOut` (4 names), best first.
-- Optional but encouraged: `ap`, your AP Top 25 ballot (25 names, best first).
+- **No AP ballot.** The AP poll is the commissioner's own vote. Editions used to carry HQ's ballot (`ap`) and it
+  overwrote theirs on the site; the publisher now rejects a draft with `ap`. You can talk about the AP poll in the article.
 - Optional: `commAdj`, [{team, adj, reason}] if you want your committee adjustments on record.
 - Team names must be the canonical names in `data/league.json` (e.g. "Uconn", "St. Louis", "Miami (OH)").
 
@@ -72,7 +79,7 @@ comparisons in the article.
 
 House style (see past editions): opens "Good morning from Bracketology HQ.", sections headed by a line in CAPITALS on
 its own, plain text paragraphs separated by blank lines. **Never use em dashes** (the commissioner hates them; the
-publisher rejects them). 1,800-3,000 words. Headline: `Week N: <three storylines, comma separated, last one with "and">`.
+publisher rejects them). Under 1,500 words (the commissioner's standing ask since Season 3 week 5): skip anything that doesn't earn its place, maximise the interesting stuff and the humour. Headline: `Week N: <three storylines, comma separated, last one with "and">`.
 
 Every edition covers, in whatever order and with whatever section names fit the week:
 1. **The week in one breath**: what was big and what wasn't, and why.
@@ -95,7 +102,7 @@ Write the draft to `<scratch>/edition-week-N.json`:
 { "season": "season-2", "week": 5, "afterDay": 15,
   "headline": "Week 5: ...", "body": "Good morning from Bracketology HQ. ...",
   "field": [ { "team": "Alabama", "seed": 1, "region": "East", "bid": "Auto", "ff": null, "note": "optional one-liner" } ],
-  "firstFourOut": ["..."], "nextFourOut": ["..."], "ap": ["... 25 names ..."] }
+  "firstFourOut": ["..."], "nextFourOut": ["..."] }
 ```
 `week` = the export's `nextWeek`; `afterDay` = the export's `throughDay`.
 

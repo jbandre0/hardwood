@@ -16,7 +16,7 @@ const body = Array.from({ length: 60 }, (_, i) => `Paragraph ${i} about the week
 const draft = (over = {}) => ({ season: "season-2", week: 5, afterDay: 13, headline: "Week 5: A Test Edition", body,
   field: w4.filter((p) => p.group === "Field").map((p) => ({ team: L[p.team].name, seed: p.seed, region: p.region, bid: p.bid, ff: p.ff })),
   firstFourOut: w4.filter((p) => p.group === "First Four Out").map((p) => L[p.team].name), nextFourOut: w4.filter((p) => p.group === "Next Four Out").map((p) => L[p.team].name),
-  ap: st.content.ap[st.content.ap.length - 1].ranks.map((id) => L[id].name), ...over });
+  ...over });
 const run = (d) => { fs.writeFileSync(`${TMP}/draft.json`, JSON.stringify(d)); try { return { ok: true, out: execFileSync("node", [`${ROOT}/tools/publish_edition.mjs`, `${TMP}/draft.json`, "--export", `${TMP}/export.json`, "--dry-run"], { encoding: "utf8", stdio: "pipe" }) }; } catch (e) { return { ok: false, out: e.stderr + e.stdout }; } };
 
 test("publisher accepts a valid edition (dry run)", () => { const r = run(draft()); assert.ok(r.ok, r.out); assert.match(r.out, /OK \(dry run\): season-2 week 5/); });
@@ -26,12 +26,25 @@ test("publisher rejects unknown teams, two auto bids in a conference, em dashes,
   assert.match(run(draft({ body: body + "\n\nA dash — here." })).out, /em dashes/);
   const d4 = draft(); d4.field.pop(); assert.ok(!run(d4).ok);
   assert.match(run(draft({ week: 4 })).out, /OK|already published/);
+  assert.match(run(draft({ ap: ["Alabama"] })).out, /must not include an AP ballot/);
 });
-test("a published edition replaces that week's field, article and ballot on the site", () => {
-  const e = { week: 4, afterDay: 12, publishedAt: "x", headline: "Week 4: Replaced", body: "New text", picks: w4.map((p) => ({ ...p, note: "ed" })), ap: st.content.ap[4].ranks.slice().reverse() };
+test("a published edition replaces that week's field and article on the site, never the AP ballot", () => {
+  const own = st.content.ap.find((b) => b.week === 4).ranks;
+  const e = { week: 4, afterDay: 12, publishedAt: "x", headline: "Week 4: Replaced", body: "New text", picks: w4.map((p) => ({ ...p, note: "ed" })), ap: own.slice().reverse(), hqAp: own.slice().reverse() };
   const s2 = createState({ ...data, editions: [e] });
   assert.ok(s2.content.picks.filter((p) => p.week === 4).every((p) => p.note === "ed"));
   const arts = s2.content.articles.filter((a) => a.week === 4); assert.equal(arts.length, 1); assert.equal(arts[0].headline, "Week 4: Replaced");
-  assert.equal(s2.content.ap.find((b) => b.week === 4).ranks[0], st.content.ap[4].ranks[24]);
+  assert.deepEqual(s2.content.ap.find((b) => b.week === 4).ranks, own);
   assert.equal(s2.content.picks.filter((p) => p.week === 3).length, st.content.picks.filter((p) => p.week === 3).length);
+});
+
+test("apRestore puts the commissioner's ballot back only while HQ's ballot is still the stored one", () => {
+  const own = st.content.ap.find((b) => b.week === 4).ranks, hq = own.slice().reverse();
+  const e = { week: 4, afterDay: 12, publishedAt: "x", headline: "Week 4", body: "x", picks: w4, hqAp: hq, apRestore: own.slice() };
+  const overwritten = { ...data, polls: { ...data.polls, ap: data.polls.ap.map((b) => (b.week === 4 ? { ...b, ranks: hq.slice() } : b)) } };
+  const s3 = createState({ ...overwritten, editions: [e] });
+  assert.deepEqual(s3.content.ap.find((b) => b.week === 4).ranks, own);
+  const revoted = own.slice(1).concat(own[0]);
+  const s4 = createState({ ...data, polls: { ...data.polls, ap: data.polls.ap.map((b) => (b.week === 4 ? { ...b, ranks: revoted } : b)) }, editions: [e] });
+  assert.deepEqual(s4.content.ap.find((b) => b.week === 4).ranks, revoted);
 });

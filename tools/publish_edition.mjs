@@ -3,7 +3,7 @@
 //   node tools/publish_edition.mjs <draft.json> --export <season-export.json> [--replace] [--dry-run]
 // The draft names teams by their canonical names (league.json). Everything is validated before anything is written:
 // 68 teams, 4 per seed line per region except the First Four pairs, one automatic bid per conference held by a team of
-// that conference, no team twice, bubble lists, an AP ballot of 25 distinct teams (optional), and the article
+// that conference, no team twice, bubble lists, no AP ballot (that is the commissioner's), and the article
 // (headline + body, no em dashes). Exit code 1 with a list of problems if anything is off.
 import fs from "node:fs";
 import path from "node:path";
@@ -47,12 +47,8 @@ if (!errors.length) {
   const atLarge = picks.filter((p) => p.group === "Field" && p.bid !== "Auto").length;
   if (atLarge !== 37) errors.push(`${atLarge} at-large bids (should be 37)`);
 }
-let ap = null;
-if (draft.ap) {
-  ap = draft.ap.map(idOf);
-  if (ap.length !== 25) errors.push(`AP ballot has ${ap.length} teams (needs 25)`);
-  if (new Set(ap).size !== ap.length) errors.push("AP ballot lists a team twice");
-}
+// The AP poll is the commissioner's own ballot. An edition never carries one (it used to, and it overwrote theirs).
+if (draft.ap) errors.push("drafts must not include an AP ballot (\"ap\"): the AP poll belongs to the commissioner. Remove it.");
 const headline = (draft.headline || "").trim(), body = (draft.body || "").trim();
 if (!headline || !body) errors.push("headline and body are required");
 let prose = headline + "\n" + body; for (const t of [...league].sort((a, b) => b.name.length - a.name.length)) prose = prose.split(t.name).join("");
@@ -64,8 +60,8 @@ const list = all[season] || [];
 if (list.some((e) => e.week === week) && !flag("--replace")) errors.push(`Week ${week} of ${season} is already published (use --replace to overwrite it)`);
 
 if (errors.length) { console.error("NOT PUBLISHED. Fix these:\n- " + [...new Set(errors)].join("\n- ")); if (warnings.length) console.error("Warnings:\n- " + warnings.join("\n- ")); process.exit(1); }
-const edition = { week, afterDay, publishedAt: new Date().toISOString(), headline, body, picks, ...(ap ? { ap } : {}), ...(draft.commAdj ? { commAdj: draft.commAdj.map((a) => ({ team: idOf(a.team), adj: a.adj, reason: a.reason || "" })) } : {}), words };
+const edition = { week, afterDay, publishedAt: new Date().toISOString(), headline, body, picks, ...(draft.commAdj ? { commAdj: draft.commAdj.map((a) => ({ team: idOf(a.team), adj: a.adj, reason: a.reason || "" })) } : {}), words };
 all[season] = [...list.filter((e) => e.week !== week), edition].sort((a, b) => a.week - b.week);
-if (flag("--dry-run")) { console.log(`OK (dry run): ${season} week ${week}, ${picks.length} picks, ${words} words${ap ? ", AP ballot" : ""}`); }
-else { fs.writeFileSync(file, JSON.stringify(all)); console.log(`Published ${season} week ${week}: "${headline}" (${words} words, ${picks.length} picks${ap ? ", AP ballot" : ""}) -> data/editions.json`); }
+if (flag("--dry-run")) { console.log(`OK (dry run): ${season} week ${week}, ${picks.length} picks, ${words} words`); }
+else { fs.writeFileSync(file, JSON.stringify(all)); console.log(`Published ${season} week ${week}: "${headline}" (${words} words, ${picks.length} picks) -> data/editions.json`); }
 if (warnings.length) console.log("Warnings:\n- " + warnings.join("\n- "));

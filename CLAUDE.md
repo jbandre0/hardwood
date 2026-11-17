@@ -25,8 +25,8 @@ never write an edition from stale data.
 When the commissioner says "do bracketology" (or similar), use the **bracketology skill**
 (`.claude/skills/bracketology/SKILL.md`) and follow it exactly. In short:
 1. `git pull` first. Find the export (`node tools/latest_export.mjs`), then `node tools/bracketology_brief.mjs <export> > brief.md`.
-2. Read the brief and the last two editions' articles. Build the 68-team field, bubble and AP ballot, write the 1,800 to 3,000 word
-   article (judgment, hot takes, patterns, callbacks; **no simulations**).
+2. Read the brief and the last two editions' articles. Build the 68-team field and bubble (never an AP ballot: that's the commissioner's vote), write the article (under 1,500 words, the commissioner's standing ask: cut filler, maximise the interesting stuff and the humour;
+   judgment, hot takes, patterns, callbacks; **no simulations**).
 3. `node tools/publish_edition.mjs <draft> --export <export> --dry-run`, fix every error, publish, then
    `node tools/save_backup.mjs <export>`. Once the NCAA field exists (after day 47), also file the bracket challenge entry with
    `tools/publish_challenge.mjs`.

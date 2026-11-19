@@ -59,15 +59,15 @@ comparisons in the article.
   champion). Mark them `"bid": "Auto"`.
 - 37 at-large bids. Every other field team is `"bid": "At-large"`.
 - Seeds 1-16 in four regions: East, South, West, Midwest. Overall No. 1 seed goes to the East.
-- First Four: two games on the 11 line (the last four at-large teams in) and two on the 16 line (the four weakest
-  automatic bids). Both teams of a First Four game share seed and region; give them `"ff": 1..4`
-  (1-2 = 11 line, 3-4 = 16 line). Every other team has `"ff": null`.
-- Seed every team where its résumé belongs, automatic bids included (the commissioner's rule). A strong mid-major
-  champion (an unbeaten New Mexico State, a 10-1 East Tennessee State) can sit on the 6 or 9 line, and that can push
-  at-large teams onto the 12 line or lower. That's allowed. The last four in are still the four weakest at-large
-  teams, and they still play the First Four on the 11 line, even though that's a better seed number than an at-large
-  12: playing an extra game is the worse deal. Never bury a mid-major champion on the 12 line just to keep
-  at-large teams above it.
+- First Four (the commissioner's rule since Season 3 week 9): four play-in games. Two are the last four at-large teams
+  (`"ff": 1` and `2`), two are the four weakest automatic bids (`"ff": 3` and `4`). A play-in game is NOT pinned to the
+  11 or 16 line: it is one bracket slot, seeded where its two teams belong on the S-curve, like every other slot. In a
+  normal year that's around the 11 line and the 16 line; in a year full of strong small-conference champions the
+  at-large games may land on the 12 or 13 line, below at-large teams that are seeded 12 or 13 by merit. Both teams of
+  a game share seed and region. Every other team has `"ff": null`. Explain where the games landed in the article.
+- Seed every team where its résumé belongs, automatic bids included. A strong mid-major champion can sit on the 4 or
+  9 line, and that pushes at-large teams down. The last four in are still the four weakest at-large teams, and they
+  still play the extra game. The site's field suggester (`suggestField`) follows the same rule.
 - Keep a conference's top teams in different regions where you can.
 - Bubble: `firstFourOut` (4 names) and `nextFourOut` (4 names), best first.
 - **No AP ballot.** The AP poll is the commissioner's own vote. Editions used to carry HQ's ballot (`ap`) and it

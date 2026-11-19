@@ -46,22 +46,19 @@ export function suggestField(rows, atLarge = 37, champs = null) {
   const open = rows.filter((r) => !autoIds.has(r.team)).sort((a, b) => b.score - a.score);
   const largeIn = open.slice(0, atLarge), firstOut = open.slice(atLarge, atLarge + 4), nextOut = open.slice(atLarge + 4, atLarge + 8);
   const autos = [...byConf.values()].sort((a, b) => b.score - a.score);
-  // First Four: the four weakest at-large teams (11 line) and the four weakest auto-bids (16 line)
+  // First Four: the four weakest at-large teams (games 1-2) and the four weakest auto-bids (games 3-4). A play-in game
+  // is not pinned to the 11 or 16 line: it's one bracket slot, seeded where its two teams belong on the S-curve (the
+  // average of their Seed Scores), like every other slot. In a year with strong small-conference champions the
+  // at-large games can land on the 12 or 13 line; in a normal year they come out around 11 and the auto-bid games at 16.
   const ffLarge = largeIn.slice(-4), ffAuto = autos.slice(-4);
-  const direct = [...largeIn.slice(0, -4), ...autos.slice(0, -4)].map((r) => ({ r, s: r.seedScore })).sort((a, b) => b.s - a.s).map((x) => x.r);
+  const slots = [...largeIn.slice(0, -4), ...autos.slice(0, -4)].map((r) => ({ teams: [r], s: r.seedScore }));
+  [[ffLarge.slice(0, 2), 1], [ffLarge.slice(2, 4), 2], [ffAuto.slice(0, 2), 3], [ffAuto.slice(2, 4), 4]]
+    .forEach(([teams, g]) => slots.push({ teams, ff: g, s: (teams[0].seedScore + teams[1].seedScore) / 2 }));
+  slots.sort((a, b) => b.s - a.s);
   const picks = [];
   const regionsFor = (line) => (line % 2 === 1 ? REGIONS : [...REGIONS].reverse());
-  let i = 0;
   const place = (r, seed, region, ffGame) => picks.push({ group: "Field", team: r.team, seed, region, bid: autoIds.has(r.team) ? "Auto" : "At-large", ff: ffGame || null, bubble: null, note: "" });
-  for (let line = 1; line <= 16; line++) {
-    const regs = regionsFor(line);
-    if (line === 11 || line === 16) {
-      const ffTeams = line === 11 ? ffLarge : ffAuto;
-      place(direct[i++], line, regs[0]); place(direct[i++], line, regs[1]);
-      ffTeams.slice(0, 2).forEach((r) => place(r, line, regs[2], line === 11 ? 1 : 3));
-      ffTeams.slice(2, 4).forEach((r) => place(r, line, regs[3], line === 11 ? 2 : 4));
-    } else for (const reg of regs) place(direct[i++], line, reg);
-  }
+  slots.forEach((slot, i) => { const line = Math.floor(i / 4) + 1, region = regionsFor(line)[i % 4]; for (const r of slot.teams) place(r, line, region, slot.ff); });
   firstOut.forEach((r, k) => picks.push({ group: "First Four Out", team: r.team, seed: null, region: null, bid: null, ff: null, bubble: k + 1, note: "" }));
   nextOut.forEach((r, k) => picks.push({ group: "Next Four Out", team: r.team, seed: null, region: null, bid: null, ff: null, bubble: k + 5, note: "" }));
   return picks;

@@ -34,7 +34,7 @@ import { downloadSeasonExport } from "../export-download.js";
       const field = cur.filter((p) => p.group === "Field");
       const regionCard = (R) => `<div class="card"><div class="card-head"><h2>${R}</h2></div>${field.filter((p) => p.region === R).sort((a, b) => a.seed - b.seed).map(cell).join("")}</div>`;
       const group = (g) => cur.filter((p) => p.group === g).sort((a, b) => (a.bubble ?? 0) - (b.bubble ?? 0)).map(cell).join("") || '<span class="muted">None</span>';
-      const val = week != null ? validateField(cur) : { errors: [], warnings: [] };
+      const val = week != null ? validateField(cur, (id) => teams[id] && teams[id].conf) : { errors: [], warnings: [] };
       view.innerHTML = `
         <div class="page-title"><span class="kicker">${esc(season.label)}</span><h1>Bracketology</h1>
           <p>The weekly projected field. Seeds come from a committee score: power rating, win percentage, quadrant wins and bad losses.</p></div>
@@ -106,7 +106,7 @@ import { downloadSeasonExport } from "../export-download.js";
 
     function editor() {
       return `<div class="card" style="margin-bottom:18px" id="ed"><div class="card-head"><h2>Editor</h2><span class="muted">${season.status === "complete" ? "This season is complete; edits change the archive in this browser only." : "Through day " + season.day}</span></div>
-        <p class="muted">Suggest builds a full field from the Board for a new week (auto-bid = best Score per conference). Seeds are set by S-curve and do not avoid conference rematches, so review before saving. Saved to this browser; use Commissioner export to back up.</p>
+        <p class="muted">Suggest builds a full field from the Board for a new week (auto-bid = best Score per conference). Seeds are set by S-curve, and same-conference teams are kept out of each other's first two rounds. Saved to this browser; use Commissioner export to back up.</p>
         <div class="btn-row"><button class="btn" id="suggest" type="button">Suggest week ${(weeks().slice(-1)[0] ?? -1) + 1}</button><button class="btn ghost" id="del" type="button" ${week == null ? "disabled" : ""}>Delete week ${week ?? ""}</button></div><p id="edmsg" class="muted"></p></div>`;
     }
     function wireEditor() {
@@ -114,7 +114,7 @@ import { downloadSeasonExport } from "../export-download.js";
       document.getElementById("suggest").onclick = async () => {
         const nw = (weeks().slice(-1)[0] ?? -1) + 1, rows = board();
         const picks = suggestField(rows, S.atLarge).map((p) => ({ ...p, week: nw }));
-        const v = validateField(picks);
+        const v = validateField(picks, (id) => teams[id] && teams[id].conf);
         if (v.errors.length) { msg.textContent = "Suggested field invalid: " + v.errors[0]; return; }
         setContent(state, "picks", [...picksAll(), ...picks]);
         const ap = state.content.ap; state.content.weeks[nw] = season.day;

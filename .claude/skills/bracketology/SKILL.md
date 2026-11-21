@@ -68,7 +68,11 @@ comparisons in the article.
 - Seed every team where its résumé belongs, automatic bids included. A strong mid-major champion can sit on the 4 or
   9 line, and that pushes at-large teams down. The last four in are still the four weakest at-large teams, and they
   still play the extra game. The site's field suggester (`suggestField`) follows the same rule.
-- Keep a conference's top teams in different regions where you can.
+- **Hard rule (the commissioner's): no same-conference meetings in the first or second round.** Two teams from one
+  conference may never share a pod in a region (pods: 1/16/8/9, 5/12/4/13, 6/11/3/14, 7/10/2/15). The publisher rejects
+  a field that breaks it; `separateConferences` in `js/league/field.js` fixes one by swapping slots along the same seed
+  line (or one line over as a last resort). The site's own field builder applies it too. Beyond that, keep a
+  conference's top teams in different regions where you can.
 - Bubble: `firstFourOut` (4 names) and `nextFourOut` (4 names), best first.
 - **No AP ballot.** The AP poll is the commissioner's own vote. Editions used to carry HQ's ballot (`ap`) and it
   overwrote theirs on the site; the publisher now rejects a draft with `ap`. You can talk about the AP poll in the article.

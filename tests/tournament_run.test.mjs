@@ -19,7 +19,7 @@ test("Season 2 can be played through conference tournaments and the NCAA bracket
       const rows = computeBoard({ teams, games: st.games, throughDay: 47, picks: [], commAdj: [], settings: B.settings }).rows;
       const champs = new Map(st.games.filter((g) => g.type === "CT" && g.day === 47).map((g) => [g.ctx, g.ptsA > g.ptsB ? g.a : g.b]));
       const picks = suggestField(rows, B.settings.atLarge, champs);
-      assert.deepEqual(validateField(picks).errors, []);
+      assert.deepEqual(validateField(picks, new Map(rows.map((r) => [r.team, r.conf]))).errors, []);
       for (const [conf, team] of champs) assert.ok(picks.some((p) => p.group === "Field" && p.team === team), "every conference champion is in the field");
       setContent(st, "field", picks.filter((p) => p.group === "Field").map((p) => ({ team: p.team, seed: p.seed, region: p.region, ff: p.ff })));
       syncTournament(st);

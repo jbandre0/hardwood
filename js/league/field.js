@@ -1,8 +1,31 @@
 // Helpers for the tournament field: validate a set of committee picks, suggest a field from the Board, and compare weeks.
 export const REGIONS = ["East", "South", "West", "Midwest"];   // overall No. 1 seed goes East (workbook layout)
 
-/** picks for one week -> {errors[], warnings[]} */
-export function validateField(picks) {
+// The four "pods" of a region: the teams in a pod can meet in the round of 64 or the round of 32.
+const POD_OF = { 1: 0, 16: 0, 8: 0, 9: 0, 5: 1, 12: 1, 4: 1, 13: 1, 6: 2, 11: 2, 3: 2, 14: 2, 7: 3, 10: 3, 2: 3, 15: 3 };
+const confLookup = (confOf) => (!confOf ? null : typeof confOf === "function" ? confOf : (id) => confOf.get(id));
+
+/**
+ * Hard rule (the commissioner's): no two teams from the same conference may meet in the first or second round, i.e.
+ * share a pod. The two teams of one First Four game are a single slot and are not checked against each other.
+ * field: [{team, seed, region, ff}], confOf: Map id -> conference or a function. -> [{region, conf, teams:[a,b]}]
+ */
+export function conferenceConflicts(field, confOf) {
+  const conf = confLookup(confOf), out = [];
+  if (!conf) return out;
+  const pods = new Map();
+  for (const p of field) { if (!(p.seed >= 1 && p.seed <= 16)) continue; const k = `${p.region}|${POD_OF[p.seed]}`; pods.set(k, [...(pods.get(k) || []), p]); }
+  for (const [k, ps] of pods) for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
+    const a = ps[i], b = ps[j];
+    if (a.ff && a.ff === b.ff) continue;
+    const ca = conf(a.team);
+    if (ca && ca === conf(b.team)) out.push({ region: k.split("|")[0], conf: ca, teams: [a, b] });
+  }
+  return out;
+}
+
+/** picks for one week -> {errors[], warnings[]}. With confOf, same-conference first/second-round meetings are errors. */
+export function validateField(picks, confOf = null) {
   const errors = [], warnings = [];
   const field = picks.filter((p) => p.group === "Field");
   if (field.length !== 68) errors.push(`The field has ${field.length} teams, not 68.`);
@@ -27,6 +50,7 @@ export function validateField(picks) {
     else if (t[0].seed !== t[1].seed || t[0].region !== t[1].region) errors.push(`First Four game ${g} teams must share a seed and region.`);
   }
   for (const [k, n] of slots) { const [r, s] = k.split("|"); if (n === 2 && !field.some((p) => p.region === r && p.seed === +s && p.ff > 0)) errors.push(`${r} has two ${s} seeds that are not a First Four game.`); }
+  for (const c of conferenceConflicts(field, confOf)) errors.push(`Same-conference teams (${c.conf}) could meet in the first or second round: ${c.region} ${c.teams[0].seed} seed (id ${c.teams[0].team}) and ${c.teams[1].seed} seed (id ${c.teams[1].team}).`);
   const nf = picks.filter((p) => p.group === "First Four Out").length, nn = picks.filter((p) => p.group === "Next Four Out").length;
   if (nf !== 4) warnings.push(`First Four Out lists ${nf} teams (usually 4).`);
   if (nn !== 4) warnings.push(`Next Four Out lists ${nn} teams (usually 4).`);
@@ -59,9 +83,43 @@ export function suggestField(rows, atLarge = 37, champs = null) {
   const regionsFor = (line) => (line % 2 === 1 ? REGIONS : [...REGIONS].reverse());
   const place = (r, seed, region, ffGame) => picks.push({ group: "Field", team: r.team, seed, region, bid: autoIds.has(r.team) ? "Auto" : "At-large", ff: ffGame || null, bubble: null, note: "" });
   slots.forEach((slot, i) => { const line = Math.floor(i / 4) + 1, region = regionsFor(line)[i % 4]; for (const r of slot.teams) place(r, line, region, slot.ff); });
+  separateConferences(picks, new Map(rows.map((r) => [r.team, r.conf])));
   firstOut.forEach((r, k) => picks.push({ group: "First Four Out", team: r.team, seed: null, region: null, bid: null, ff: null, bubble: k + 1, note: "" }));
   nextOut.forEach((r, k) => picks.push({ group: "Next Four Out", team: r.team, seed: null, region: null, bid: null, ff: null, bubble: k + 5, note: "" }));
   return picks;
+}
+
+/**
+ * Move bracket slots (a team, or a First Four pair) until no two same-conference teams share a pod. Swaps prefer the
+ * same seed line in another region (the seed doesn't change); if that can't clear a conflict, a slot may trade places
+ * with a slot one line away. Mutates picks; returns the number of conflicts left (0 unless the field is impossible).
+ */
+export function separateConferences(picks, confOf) {
+  const field = picks.filter((p) => p.group === "Field");
+  const count = () => conferenceConflicts(field, confOf).length;
+  const slotOf = (region, seed) => field.filter((p) => p.region === region && p.seed === seed);
+  const swap = (A, B) => { const a = { region: A[0].region, seed: A[0].seed }, b = { region: B[0].region, seed: B[0].seed }; for (const p of A) { p.region = b.region; p.seed = b.seed; } for (const p of B) { p.region = a.region; p.seed = a.seed; } };
+  for (let guard = 0, n = count(); n > 0 && guard < 200; guard++) {
+    const c = conferenceConflicts(field, confOf)[0];
+    let best = null;
+    for (const t of [...c.teams].sort((x, y) => y.seed - x.seed)) {           // try moving the lower seed first
+      const A = slotOf(t.region, t.seed);
+      const targets = [];
+      for (const R of REGIONS) if (R !== t.region) targets.push([R, t.seed]);
+      for (const d of [1, -1]) for (const R of REGIONS) if (t.seed + d >= 1 && t.seed + d <= 16) targets.push([R, t.seed + d]);
+      for (const [R, s] of targets) {
+        const B = slotOf(R, s); if (!B.length || B.some((p) => A.includes(p))) continue;
+        if (s !== t.seed && (A.some((p) => p.ff) !== B.some((p) => p.ff))) continue;   // keep First Four slots paired by line kind
+        swap(A, B); const m = count(); swap(B, A);
+        const cost = m * 10 + Math.abs(s - t.seed);
+        if (m < n && (!best || cost < best.cost)) best = { A, B, cost, m };
+      }
+      if (best && best.m === 0) break;
+    }
+    if (!best) break;
+    swap(best.A, best.B); n = best.m;
+  }
+  return count();
 }
 
 /** change label of a team's field entry versus the previous week */

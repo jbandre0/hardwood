@@ -184,7 +184,7 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
       const tm = teams.map((t) => ({ id: t.id, conf: t.conf, rating: t.rating, eff: t.eff }));
       const rows = computeBoard({ teams: tm, games: state.games, throughDay: 47, picks: [], commAdj: [], settings: S }).rows;
       const champs = new Map(state.games.filter((g) => g.type === "CT" && g.day === 47).map((g) => [g.ctx, g.ptsA > g.ptsB ? g.a : g.b]));
-      const picks = suggestField(rows, S.atLarge, champs), v = validateField(picks);
+      const picks = suggestField(rows, S.atLarge, champs), v = validateField(picks, new Map(teams.map((t) => [t.id, t.conf])));
       if (v.errors.length) { document.getElementById("status").textContent = "Could not build a valid field: " + v.errors[0]; return; }
       setContent(state, "field", picks.filter((p) => p.group === "Field").map((p) => ({ team: p.team, seed: p.seed, region: p.region, ff: p.ff })));
       syncTournament(state); await persist(); await render();

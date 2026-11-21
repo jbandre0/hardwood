@@ -36,7 +36,7 @@ for (const f of draft.field || []) picks.push({ group: "Field", team: idOf(f.tea
 (draft.firstFourOut || []).forEach((n, i) => picks.push({ group: "First Four Out", team: idOf(n), seed: null, region: null, bid: null, ff: null, bubble: i + 1, note: "" }));
 (draft.nextFourOut || []).forEach((n, i) => picks.push({ group: "Next Four Out", team: idOf(n), seed: null, region: null, bid: null, ff: null, bubble: i + 5, note: "" }));
 if (!errors.length) {
-  const v = validateField(picks); errors.push(...v.errors); warnings.push(...v.warnings);
+  const v = validateField(picks, confOf); errors.push(...v.errors); warnings.push(...v.warnings);
   const autos = picks.filter((p) => p.group === "Field" && p.bid === "Auto"), byConf = new Map();
   for (const p of autos) { const k = confOf.get(p.team); byConf.set(k, [...(byConf.get(k) || []), p.team]); }
   for (const k of new Set(confOf.values())) {

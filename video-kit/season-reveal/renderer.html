@@ -1,0 +1,364 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Selection Sunday reveal</title>
+<style>
+@font-face { font-family: 'BC'; font-weight: 800; src: url(fonts/BarlowCondensed-800.woff2) format('woff2'); }
+@font-face { font-family: 'BC'; font-weight: 600; src: url(fonts/BarlowCondensed-600.woff2) format('woff2'); }
+@font-face { font-family: 'B'; font-weight: 600; src: url(fonts/Barlow-600.woff2) format('woff2'); }
+@font-face { font-family: 'B'; font-weight: 500; src: url(fonts/Barlow-500.woff2) format('woff2'); }
+html, body { margin: 0; background: #000; overflow: hidden; }
+canvas { display: block; }
+</style></head>
+<body><canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// Deterministic frame renderer for the Selection Sunday reveal. window.render(clipNumber, localSeconds) draws one frame.
+// Data comes from <dir>/field.json, outs.json, plan.json (dir = ?d=...). No team is hard-coded here.
+const W = 1920, H = 1080, cv = document.getElementById("c"), g = cv.getContext("2d");
+const D = new URLSearchParams(location.search).get("d") || "data";
+let FIELD, OUTS, PLAN; const imgs = {}, accent = {}, warnings = [];
+const SEASON = new URLSearchParams(location.search).get("season") || "3";
+window.warnings = warnings;
+const loadImg = (src) => new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => { warnings.push("missing image " + src); res(null); }; i.src = src; });
+window.ready = (async () => {
+  [FIELD, OUTS, PLAN] = await Promise.all(["field", "outs", "plan"].map((n) => fetch(`${D}/${n}.json`).then((r) => r.json())));
+  FIELD.forEach((t, i) => { t._i = i; });
+  await Promise.all([document.fonts.load("800 100px BC"), document.fonts.load("600 100px BC"), document.fonts.load("600 40px B"), document.fonts.load("500 40px B")]);
+  const all = [...FIELD, ...OUTS];
+  await Promise.all([...all.map(async (t) => { imgs[t.id] = await loadImg(t.logo); if (imgs[t.id]) accent[t.id] = dominant(imgs[t.id]); }), loadImg("assets/brand/hardwood-mark.png").then((i) => { imgs.mark = i; }), loadImg("assets/brand/icon-512.png").then((i) => { imgs.icon = i; })]);
+  return true;
+})();
+function dominant(img) {
+  const c = document.createElement("canvas"); c.width = c.height = 32; const x = c.getContext("2d"); x.drawImage(img, 0, 0, 32, 32);
+  const d = x.getImageData(0, 0, 32, 32).data; let r = 0, gg = 0, b = 0, n = 0;
+  for (let i = 0; i < d.length; i += 4) { if (d[i + 3] < 140) continue; const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]); const sat = mx ? (mx - mn) / mx : 0; if (sat < .28 || mx < 60) continue; r += d[i] * sat; gg += d[i + 1] * sat; b += d[i + 2] * sat; n += sat; }
+  if (!n) return "255,214,165"; return `${Math.round(r / n)},${Math.round(gg / n)},${Math.round(b / n)}`;
+}
+
+// ---------- helpers
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut = (x) => 1 - Math.pow(1 - x, 3), easeIn = (x) => x * x * x;
+const easeInOut = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const back = (x) => { const c = 2.2; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const rnd = (i) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const PER = () => PLAN.PER;
+function fit(text, weight, family, maxW, size, min) {   // largest size <= size that fits maxW; logs if it had to go below min
+  g.save(); g.letterSpacing = "0px"; let s = size;
+  for (; s > 8; s -= 2) { g.font = `${weight} ${s}px ${family}`; if (g.measureText(text).width <= maxW) break; }
+  g.restore(); if (s < min) warnings.push(`text of length ${text.length} shrunk below ${min} -> ${s}`); return s;
+}
+function wrap(text, font, maxW) {
+  g.save(); g.font = font; g.letterSpacing = "0px"; const out = []; let cur = "";
+  for (const w of text.split(/\s+/)) { const t = cur ? cur + " " + w : w; if (g.measureText(t).width > maxW && cur) { out.push(cur); cur = w; } else cur = t; }
+  if (cur) out.push(cur); g.restore(); return out;
+}
+function glass(x, y, w, h, r, { glow = 0, tint = "255,255,255", alpha = .14, stroke = .55, glowRGB = "255,214,165" } = {}) {
+  g.save(); g.beginPath(); g.roundRect(x, y, w, h, r);
+  if (glow > 0) { g.shadowColor = `rgba(${glowRGB},${glow})`; g.shadowBlur = 40 * glow; }
+  const f = g.createLinearGradient(x, y, x + w, y + h);
+  f.addColorStop(0, `rgba(${tint},${alpha + .12})`); f.addColorStop(.45, `rgba(${tint},${alpha * .5})`); f.addColorStop(1, `rgba(${tint},${alpha + .05})`);
+  g.fillStyle = f; g.fill(); g.shadowBlur = 0; g.lineWidth = 2; g.strokeStyle = `rgba(255,255,255,${stroke})`; g.stroke();
+  g.beginPath(); g.roundRect(x + 3, y + 3, w - 6, h * .42, Math.max(2, r - 2));
+  const hl = g.createLinearGradient(0, y, 0, y + h * .45); hl.addColorStop(0, "rgba(255,255,255,.32)"); hl.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = hl; g.fill(); g.restore();
+}
+function drawLogo(img, cx, cy, size, alpha = 1, shadow = true) {
+  if (!img) return; const ar = img.naturalWidth / img.naturalHeight, w = ar >= 1 ? size : size * ar, h = ar >= 1 ? size / ar : size;
+  g.save(); g.globalAlpha *= alpha; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+  if (shadow) { g.shadowColor = "rgba(0,0,0,.55)"; g.shadowBlur = size > 100 ? 24 : 8; g.shadowOffsetY = size > 100 ? 10 : 3; }
+  g.drawImage(img, cx - w / 2, cy - h / 2, w, h); g.restore();
+}
+function text(str, x, y, { font = "800 60px BC", fill = "#fff", align = "center", base = "middle", ls = "0px", stroke = null, sw = 6, alpha = 1 } = {}) {
+  g.save(); g.globalAlpha *= alpha; g.font = font; g.textAlign = align; g.textBaseline = base; g.letterSpacing = ls;
+  if (stroke) { g.lineWidth = sw; g.strokeStyle = stroke; g.lineJoin = "round"; g.strokeText(str, x, y); }
+  g.fillStyle = fill; g.fillText(str, x, y); g.restore();
+}
+const MOODS = { bright: { c0: "#102a4a", c1: "#070f1e", c2: "#02050b", beam: "120,200,255", floor: "255,160,60" }, dark: { c0: "#2a1620", c1: "#0d0a12", c2: "#030204", beam: "190,120,130", floor: "170,60,60" } };
+function background(t, energy, mood = "bright") {
+  const M = MOODS[mood];
+  const bg = g.createRadialGradient(W / 2, H * .45, 100, W / 2, H * .45, 1400);
+  bg.addColorStop(0, M.c0); bg.addColorStop(.5, M.c1); bg.addColorStop(1, M.c2); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.save(); g.globalAlpha = .35; const floor = g.createLinearGradient(0, H * .62, 0, H);
+  floor.addColorStop(0, `rgba(${M.floor},0)`); floor.addColorStop(1, `rgba(${M.floor},.35)`); g.fillStyle = floor; g.fillRect(0, H * .62, W, H * .38);
+  g.strokeStyle = mood === "dark" ? "rgba(210,150,160,.14)" : "rgba(140,190,255,.18)"; g.lineWidth = 1.2;
+  for (let i = -14; i <= 14; i++) { g.beginPath(); g.moveTo(W / 2 + i * 60, H * .66); g.lineTo(W / 2 + i * 420, H + 40); g.stroke(); }
+  for (let k = 0; k < 9; k++) { const y = H * .66 + Math.pow(k / 8, 1.8) * H * .36; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+  g.restore();
+  for (let i = 0; i < 4; i++) {
+    const a = Math.sin(t * .9 + i * 1.7) * .55 + (i - 1.5) * .22, x = W * (.2 + i * .2);
+    g.save(); g.translate(x, -80); g.rotate(a); const lg = g.createLinearGradient(0, 0, 0, 1500);
+    lg.addColorStop(0, `rgba(${M.beam},${.16 + energy * .1})`); lg.addColorStop(1, `rgba(${M.beam},0)`); g.fillStyle = lg;
+    g.beginPath(); g.moveTo(-40, 0); g.lineTo(40, 0); g.lineTo(260, 1500); g.lineTo(-260, 1500); g.closePath(); g.fill(); g.restore();
+  }
+  g.save(); for (let i = 0; i < 160; i++) { const x = rnd(i) * W, y = rnd(i + 999) * H * .6, tw = .3 + .7 * Math.abs(Math.sin(t * 2.2 + i)); g.fillStyle = `rgba(255,230,180,${.12 * tw})`; g.fillRect(x, y, 2, 2); } g.restore();
+}
+function finish(s, dur, flash = 0) {   // vignette, letterbox, boundary fades
+  const v = g.createRadialGradient(W / 2, H / 2, H * .35, W / 2, H / 2, H * .95); v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.78)");
+  g.fillStyle = v; g.fillRect(0, 0, W, H); g.fillStyle = "rgba(0,0,0,.9)"; g.fillRect(0, 0, W, 34); g.fillRect(0, H - 34, W, 34);
+  if (s < .14) { g.fillStyle = `rgba(0,0,0,${1 - s / .14})`; g.fillRect(0, 0, W, H); }
+  if (s > dur - .14) { g.fillStyle = `rgba(0,0,0,${(s - (dur - .14)) / .14})`; g.fillRect(0, 0, W, H); }
+}
+function flash(s, at, k = 9, a = .85, rgb = "255,240,220") { if (s < at) return; const f = Math.exp(-(s - at) * k); if (f > .01) { g.fillStyle = `rgba(${rgb},${f * a})`; g.fillRect(0, 0, W, H); } }
+function sparks(s, at, cx, cy, n = 90, rgb = "255,214,165") {
+  if (s < at) return; const d = s - at; if (d > 1.4) return; g.save();
+  for (let i = 0; i < n; i++) { const a = rnd(i * 3 + at * 7) * Math.PI * 2, sp = 300 + rnd(i * 3 + 1) * 900; const x = cx + Math.cos(a) * sp * d, y = cy + Math.sin(a) * sp * d + 300 * d * d; g.globalAlpha = Math.max(0, 1 - d / 1.2) * .9; g.fillStyle = `rgba(${rgb},1)`; g.fillRect(x, y, 4 + rnd(i) * 4, 4 + rnd(i) * 4); }
+  g.restore();
+}
+function flare(cx, cy, k) {   // additive lens streak, k in 0..1
+  if (k <= 0) return; g.save(); g.globalCompositeOperation = "lighter"; g.globalAlpha = k;
+  const hz = g.createLinearGradient(cx - 700, 0, cx + 700, 0); hz.addColorStop(0, "rgba(255,200,120,0)"); hz.addColorStop(.5, "rgba(255,230,190,.9)"); hz.addColorStop(1, "rgba(255,200,120,0)");
+  g.fillStyle = hz; g.fillRect(cx - 700, cy - 3, 1400, 6);
+  const rg = g.createRadialGradient(cx, cy, 0, cx, cy, 260); rg.addColorStop(0, "rgba(255,240,210,.8)"); rg.addColorStop(1, "rgba(255,200,120,0)"); g.fillStyle = rg; g.fillRect(cx - 260, cy - 260, 520, 520);
+  g.restore();
+}
+function kicker(a, t1, t2, y = 86) {
+  g.save(); g.globalAlpha *= a; text(t1, W / 2, y - (1 - a) * 20, { font: "600 34px BC", fill: "rgba(255,214,165,.95)", ls: "10px" });
+  if (t2) text(t2, W / 2, y + 42 - (1 - a) * 20, { font: "600 24px B", fill: "rgba(255,255,255,.55)", ls: "4px" }); g.restore();
+}
+
+// ---------- bracket geometry (one region)
+const BR = { x0: 240, y0: 190, slotW: 420, slotH: 46, gap: 8, colGap: 110 };
+const SEED_ORDER = [1, 16, 8, 9, 5, 12, 4, 13, 6, 11, 3, 14, 7, 10, 2, 15];
+function slotRect(round, i) { const pitch = (BR.slotH + BR.gap) * Math.pow(2, round); return { x: BR.x0 + round * (BR.slotW + BR.colGap), y: BR.y0 + i * pitch + (pitch - BR.slotH) / 2, w: BR.slotW, h: BR.slotH }; }
+function slotFilled(q, items, labelAlpha = 1) {
+  const f = Math.max(...items.map((i) => i.f)), glow = Math.max(...items.map((i) => i.glow)), seed = items[0].t.seed;
+  glass(q.x, q.y, q.w, q.h, 10, { glow: glow * .9, tint: "255,230,190", alpha: .22 + .18 * f, stroke: .9 });
+  g.save(); g.globalAlpha = f; text(String(seed), q.x + 16, q.y + q.h / 2 + 1, { font: "800 30px BC", fill: "#ffd6a5", align: "left" });
+  if (items.length === 1) {
+    const t = items[0].t, nm = t.name.toUpperCase(), fs = fit(nm, 800, "BC", q.w - 98 - 96, 30, 20);
+    drawLogo(imgs[t.id], q.x + 66, q.y + q.h / 2, 38, items[0].f);
+    text(nm, q.x + 98, q.y + q.h / 2 + 1, { font: `800 ${fs}px BC`, ls: "1px", align: "left" });
+    text(t.rec, q.x + q.w - 14, q.y + q.h / 2 + 1, { font: "600 20px B", fill: "rgba(255,255,255,.6)", align: "right" });
+  } else {
+    const hw = (q.w - 52) / 2;
+    items.forEach((it, k) => { const x0 = q.x + 48 + k * hw; g.save(); g.globalAlpha = it.f; const nm = it.t.name.toUpperCase(), fs = fit(nm, 800, "BC", hw - 40, 24, 15); drawLogo(imgs[it.t.id], x0 + 14, q.y + q.h / 2, 28, 1, false); text(nm, x0 + 34, q.y + q.h / 2 + 1, { font: `800 ${fs}px BC`, align: "left" }); g.restore(); });
+    text("/", q.x + 48 + hw - 2, q.y + q.h / 2, { font: "800 26px BC", fill: "rgba(255,214,165,.9)" });
+  }
+  g.restore();
+}
+function bracket(filled, z = 0) {   // filled: Map slotIndex -> [{t,f,glow}]
+  g.save(); g.strokeStyle = "rgba(180,220,255,.35)"; g.lineWidth = 2;
+  for (let r = 0; r < 3; r++) for (let i = 0; i < 16 / Math.pow(2, r); i += 2) {
+    const a = slotRect(r, i), b = slotRect(r, i + 1), n = slotRect(r + 1, i / 2), xm = a.x + a.w + BR.colGap / 2;
+    g.beginPath(); g.moveTo(a.x + a.w, a.y + a.h / 2); g.lineTo(xm, a.y + a.h / 2); g.lineTo(xm, b.y + b.h / 2); g.lineTo(b.x + b.w, b.y + b.h / 2); g.stroke();
+    g.beginPath(); g.moveTo(xm, n.y + n.h / 2); g.lineTo(n.x, n.y + n.h / 2); g.stroke();
+  }
+  ["FIRST ROUND", "SECOND ROUND", "SWEET 16", "ELITE EIGHT"].forEach((s, r) => { const q = slotRect(r, 0); g.save(); g.globalAlpha = clamp(1 - z * 1.6); text(s, q.x + q.w / 2, BR.y0 - 28, { font: "600 22px BC", fill: "rgba(255,214,165,.8)", ls: "4px" }); g.restore(); });
+  for (let r = 1; r < 4; r++) for (let i = 0; i < 16 / Math.pow(2, r); i++) { const q = slotRect(r, i); glass(q.x, q.y, q.w, q.h, 10, { alpha: .07, stroke: .3 }); }
+  for (let i = 0; i < 16; i++) {
+    const q = slotRect(0, i), items = filled.get(i);
+    if (items && items.length) slotFilled(q, items);
+    else { glass(q.x, q.y, q.w, q.h, 10, { alpha: .07, stroke: .3 }); g.save(); g.globalAlpha = .55; text(String(SEED_ORDER[i]), q.x + 16, q.y + q.h / 2 + 1, { font: "800 26px BC", fill: "rgba(255,214,165,.9)", align: "left" }); text("TBA", q.x + 66, q.y + q.h / 2 + 1, { font: "600 20px B", fill: "rgba(255,255,255,.35)", align: "left", ls: "3px" }); g.restore(); }
+  }
+  g.restore();
+}
+function regionFilled(region, uptoIdx, cur = null) {   // teams of this region revealed before FIELD[uptoIdx], plus optional current entry
+  const m = new Map();
+  FIELD.filter((x) => x.region === region && x._i < uptoIdx).forEach((x) => { if (!m.has(x.slotIndex)) m.set(x.slotIndex, []); m.get(x.slotIndex).push({ t: x, f: 1, glow: .2 }); });
+  if (cur) { if (!m.has(cur.t.slotIndex)) m.set(cur.t.slotIndex, []); m.get(cur.t.slotIndex).push(cur); }
+  return m;
+}
+const REG_NAME = (r) => r.toUpperCase() + " REGION";
+
+// ---------- scenes
+function teamScene(c, s) {
+  const t = FIELD[c.i], P = PER(), F = c.F * P, sl = 1 * P, lg = 3 * P, c0 = 5 * P, c1 = 7 * P, land = (c.F + 3) * P;
+  const acc = accent[t.id] || "255,214,165", isAuto = t.bid === "Auto";
+  const energy = s < sl ? 0 : Math.exp(-(s - sl) * 1.8);
+  const shake = s > sl && s < sl + .5 ? (1 - seg(s, sl, sl + .5)) * 18 : 0;
+  g.save(); g.translate((rnd(Math.floor(s * 60)) - .5) * shake, (rnd(Math.floor(s * 60) + 7) - .5) * shake);
+  background(s + t._i * 3, energy);
+  if (s < F + .8) {
+    const away = easeIn(seg(s, F, F + .6)); g.save(); g.globalAlpha = 1 - away; g.translate(0, -away * 240);
+    kicker(seg(s, 0, .4), "SELECTION SUNDAY", `${REG_NAME(t.region)}`);
+    const k = easeInOut(seg(s, c0, c1));
+    // seed number: slams in left of centre, then shrinks into the badge of the card layout
+    if (s >= sl) {
+      const q = seg(s, sl, sl + .45), sc0 = lerp(3.2, 1, back(q)), sc = lerp(sc0, .19, k), x = lerp(540, 232, k), y = lerp(500, 330, k);
+      if (k > 0) glass(x - 70 - (1 - k) * 40, y - 75, 140 + (1 - k) * 80, 150, 22, { alpha: .16 * k, stroke: .8 * k, glow: .3 * k });
+      g.save(); g.translate(x, y); g.scale(sc, sc); g.globalAlpha = clamp(q * 3); g.font = "800 520px BC"; g.textAlign = "center"; g.textBaseline = "middle";
+      g.lineWidth = 14 / Math.max(sc * 2.4, 1); g.strokeStyle = "rgba(255,214,165,.9)"; g.strokeText(String(t.seed), 0, 0);
+      const nf = g.createLinearGradient(0, -240, 0, 240); nf.addColorStop(0, "#fff"); nf.addColorStop(.5, "#dfe8ff"); nf.addColorStop(1, "#9fb3d9"); g.fillStyle = nf; g.fillText(String(t.seed), 0, 0); g.restore();
+      text("SEED", x, lerp(735, 430, k), { font: "600 44px BC", fill: "rgba(255,214,165,.9)", ls: "12px", alpha: clamp(q * 2) * (1 - k * .15) });
+    }
+    // logo tile streaks in from the right, then settles into the card layout on the left
+    if (s >= lg) {
+      const q = seg(s, lg, lg + .55), tx = lerp(W + 500, 1250, easeOut(q)), cxL = lerp(tx, 430, k), cyL = lerp(470, 560, k), size = lerp(460, 420, k), sc = lerp(2.4, 1, back(q));
+      if (q < 1) { g.save(); g.globalAlpha = (1 - q) * .7; const sg = g.createLinearGradient(tx, 0, tx + 900, 0); sg.addColorStop(0, "rgba(255,255,255,.9)"); sg.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = sg; g.fillRect(tx, H / 2 - 60, 900, 6); g.fillRect(tx + 60, H / 2 + 10, 800, 3); g.restore(); }
+      g.save(); g.translate(cxL, cyL); g.scale(sc * (1 + .02 * Math.sin(s * 5)), sc * (1 + .02 * Math.sin(s * 5)));
+      glass(-size / 2, -size / 2, size, size, 48, { glow: .6 * clamp(q * 1.5), alpha: .12, stroke: .8, glowRGB: acc }); drawLogo(imgs[t.id], 0, 0, size * .74); g.restore();
+      // name: big under the logo, then up to the header of the blurb panel
+      const n = seg(s, lg + .3, lg + .8), nm = t.name.toUpperCase(), fs0 = fit(nm, 800, "BC", 1500, 150, 70), fs1 = fit(nm, 800, "BC", 800, 96, 44), fs = lerp(fs0, fs1, k);
+      g.save(); g.font = `800 ${fs}px BC`; g.letterSpacing = "5px"; const nw = g.measureText(nm).width; g.restore();
+      const nx = lerp(W / 2 + 120 - nw / 2, 900, k), ny = lerp(H / 2 + 310, 320, k);
+      g.save(); g.globalAlpha = n; text(nm, nx, ny - (1 - easeOut(n)) * 40, { font: `800 ${fs}px BC`, ls: "5px", align: "left", stroke: "rgba(0,0,0,.6)", sw: 6 });
+      g.globalAlpha = n * (1 - k); text(`${t.rec}   ·   ${t.conf.toUpperCase()}   ·   ${isAuto ? "AUTOMATIC BID" : "AT-LARGE"}`, W / 2 + 120, H / 2 + 400 - (1 - easeOut(n)) * 40, { font: "600 40px B", fill: "rgba(255,214,165,.95)", ls: "6px" }); g.restore();
+    }
+    // blurb panel
+    if (s >= c0) {
+      const k2 = easeOut(seg(s, c0, c1)), px = lerp(1000, 860, k2), py = 250, pw = 940, ph = 620;
+      g.save(); g.globalAlpha = k2; glass(px, py, pw, ph, 30, { glow: .2, alpha: .12, stroke: .7, glowRGB: acc });
+      g.beginPath(); g.roundRect(px + 6, py + 6, 8, ph - 12, 4); g.fillStyle = `rgba(${acc},.9)`; g.fill();
+      text(`${t.rec}   ·   ${t.conf.toUpperCase()}`, px + 40, py + 140, { font: "600 34px B", fill: "rgba(255,214,165,.95)", align: "left", ls: "4px" });
+      const chip = (label, x, tint) => { g.font = "600 24px BC"; g.letterSpacing = "4px"; const w = g.measureText(label).width + 36; glass(x, py + 176, w, 44, 22, { alpha: .18, stroke: .6, tint }); text(label, x + 18, py + 199, { font: "600 24px BC", ls: "4px", align: "left" }); return w + 14; };
+      let cx = px + 40; cx += chip(isAuto ? "AUTOMATIC BID" : "AT-LARGE BID", cx, isAuto ? "255,214,165" : "170,210,255"); if (t.ff) chip(`FIRST FOUR  ·  GAME ${t.ff}`, cx, "255,255,255");
+      g.fillStyle = "rgba(255,255,255,.18)"; g.fillRect(px + 40, py + 240, pw - 80, 2);
+      const lines = wrap(t.blurb, "500 34px B", pw - 90); if (lines.length > 6) warnings.push(`blurb ${t.id} has ${lines.length} lines`);
+      lines.forEach((ln, i) => { const a = easeOut(seg(s, c1 + i * .28, c1 + i * .28 + .5)); text(ln, px + 40, py + 296 + i * 52 - (1 - a) * 14, { font: "500 34px B", fill: "rgba(255,255,255,.94)", align: "left", alpha: a }); });
+      g.restore();
+    }
+    g.restore();
+    flash(s, sl); sparks(s, sl, 540, 500);
+  }
+  // bracket phase
+  if (s >= F + .1) {
+    const fadeIn = seg(s, F + .1, F + .7), z = easeInOut(seg(s, F + .3, land)), pair = Math.floor(t.slotIndex / 2) * 2;
+    const a = slotRect(0, pair), b = slotRect(0, pair + 1), fx = a.x + a.w / 2, fy = (a.y + b.y + b.h) / 2;
+    const scale = lerp(.84, 1.9, z), cx = lerp(1245, fx, z), cy = lerp(622, fy, z), landF = seg(s, land - .12, land + .3);
+    g.save(); g.globalAlpha = fadeIn; g.translate(W / 2, H / 2); g.scale(scale, scale); g.translate(-cx, -cy);
+    bracket(regionFilled(t.region, t._i, { t, f: easeOut(landF), glow: landF > 0 ? .5 + .5 * Math.sin((s - land) * 6) * Math.exp(-(s - land)) : 0 }), z); g.restore();
+    g.save(); g.globalAlpha = fadeIn; const hb = g.createLinearGradient(0, 34, 0, 200); hb.addColorStop(0, "rgba(3,8,18,.97)"); hb.addColorStop(.65, "rgba(3,8,18,.88)"); hb.addColorStop(1, "rgba(3,8,18,0)"); g.fillStyle = hb; g.fillRect(0, 34, W, 166); g.restore();
+    g.save(); g.globalAlpha = fadeIn; text(REG_NAME(t.region), W / 2, 86, { font: "800 46px BC", fill: "rgba(255,255,255,.92)", ls: "8px" }); text("FIRST ROUND   ·   THE FIELD OF 68", W / 2, 126, { font: "600 22px B", fill: "rgba(255,214,165,.85)", ls: "4px" }); g.restore();
+    if (landF > 0 && landF < 1) { const r = lerp(60, 520, easeOut(landF)); g.save(); g.globalAlpha = 1 - landF; g.strokeStyle = "rgba(255,214,165,.9)"; g.lineWidth = 6 * (1 - landF); g.beginPath(); g.ellipse(W / 2, H / 2, r * 1.6, r * .5, 0, 0, Math.PI * 2); g.stroke(); g.restore(); }
+    flare(W / 2, H / 2, landF > 0 ? Math.exp(-(s - land) * 3.2) : 0);
+  }
+  g.restore();
+}
+function regionTitleScene(c, s) {
+  if (s < PER()) { background(s, .1 + s / PER() * .3); return; } s -= PER();
+  const R = c.region, k = easeOut(seg(s, .1, .9)), idx = PLAN.regions.indexOf(R);
+  background(s + idx * 5, .4 + .6 * Math.exp(-s * 2));
+  g.save(); const sw = easeOut(seg(s, 0, .7)); g.globalAlpha = (1 - seg(s, .7, 1.2)) * .8; const bar = g.createLinearGradient(0, 0, W, 0); bar.addColorStop(0, "rgba(255,214,165,0)"); bar.addColorStop(sw, "rgba(255,240,215,.9)"); bar.addColorStop(Math.min(1, sw + .02), "rgba(255,214,165,0)"); g.fillStyle = bar; g.fillRect(0, H / 2 - 4, W, 8); g.restore();
+  text("SELECTION SUNDAY  ·  SEASON " + SEASON, W / 2, 330, { font: "600 36px BC", fill: "rgba(255,214,165,.95)", ls: "14px", alpha: k });
+  g.save(); g.translate(0, (1 - k) * 60); g.globalAlpha = k; const sc = lerp(1.3, 1, k); g.translate(W / 2, H / 2 + 10); g.scale(sc, sc);
+  text(R.toUpperCase(), 0, 0, { font: "800 340px BC", ls: "20px", stroke: "rgba(255,214,165,.9)", sw: 10 }); g.globalCompositeOperation = "source-over"; text(R.toUpperCase(), 0, 0, { font: "800 340px BC", ls: "20px", fill: "#fff" }); g.restore();
+  text("REGION", W / 2, H / 2 + 230, { font: "600 60px BC", fill: "rgba(255,214,165,.95)", ls: "30px", alpha: k });
+  const dots = PLAN.regions; dots.forEach((r, i) => { const x = W / 2 + (i - 1.5) * 220; const on = i === idx; text(r.toUpperCase(), x, H - 150, { font: "600 28px BC", fill: on ? "#ffd6a5" : "rgba(255,255,255,.35)", ls: "6px", alpha: k }); g.fillStyle = on ? "#ffd6a5" : "rgba(255,255,255,.25)"; g.globalAlpha = k; g.fillRect(x - 60, H - 120, 120, on ? 5 : 2); g.globalAlpha = 1; });
+  flash(s, 0, 7, .7); sparks(s, 0, W / 2, H / 2, 80);
+}
+function regionDoneScene(c, s) {
+  const R = c.region, idx = PLAN.regions.indexOf(R), last = FIELD.filter((x) => x.region === R).slice(-1)[0]._i + 1;
+  background(s + idx * 5, .5);
+  const fadeIn = seg(s, 0, .5), sweep = seg(s, .3, 2.6);
+  g.save(); g.globalAlpha = fadeIn; g.translate(W / 2, H / 2 + 20); g.scale(.84, .84); g.translate(-1245, -622);
+  const m = regionFilled(R, last); for (const [, items] of m) items.forEach((it, k) => { const pulse = Math.exp(-Math.abs((it.t.slotIndex / 16) - sweep) * 14); it.glow = .15 + .6 * pulse; });
+  bracket(m, 0); g.restore();
+  text(REG_NAME(R) + "  ·  SET", W / 2, 86, { font: "800 56px BC", ls: "10px", alpha: fadeIn }); text("EVERY SLOT FILLED", W / 2, 132, { font: "600 22px B", fill: "rgba(255,214,165,.85)", ls: "6px", alpha: fadeIn });
+  flare(W / 2, 140, Math.exp(-Math.abs(s - 2.2) * 2.5) * .7);
+}
+function introScene(c, s) {
+  const P = PER(), drop = 17 * P, energy = s < drop ? .2 : .5 + .5 * Math.exp(-(s - drop) * 1.5);
+  background(s, energy);
+  const m = imgs.mark || imgs.icon;
+  if (s < drop + .2) {
+    const k = easeOut(seg(s, .6, 3.2)), sc = lerp(1.6, 1, k) + (s > 6 * P ? 0 : 0);
+    g.save(); g.globalAlpha = k * (1 - seg(s, drop - .3, drop + .2)); g.translate(W / 2, H / 2 - 20); g.scale(sc, sc);
+    if (m) { const ar = m.naturalWidth / m.naturalHeight, h = 420, w = h * ar; g.shadowColor = "rgba(255,214,165,.8)"; g.shadowBlur = 60 * k; g.drawImage(m, -w / 2, -h / 2, w, h); }
+    g.restore();
+    // glass shatter shards at beat 6
+    const sh = s - 6 * P; if (sh > 0 && sh < 2.2) { g.save(); for (let i = 0; i < 26; i++) { const a = rnd(i) * Math.PI * 2, sp = 200 + rnd(i + 40) * 700, x = W / 2 + Math.cos(a) * sp * sh, y = H / 2 - 20 + Math.sin(a) * sp * sh * .7 + 160 * sh * sh, r = 14 + rnd(i + 9) * 34; g.globalAlpha = Math.max(0, 1 - sh / 2) * .6; g.fillStyle = "rgba(190,225,255,.5)"; g.strokeStyle = "rgba(255,255,255,.7)"; g.beginPath(); g.moveTo(x, y - r); g.lineTo(x + r, y + r * .6); g.lineTo(x - r * .7, y + r * .8); g.closePath(); g.fill(); g.stroke(); } g.restore(); }
+    // riser lines
+    if (s > 14 * P && s < drop) { g.save(); g.globalAlpha = seg(s, 14 * P, drop) * .5; for (let i = 0; i < 40; i++) { const y = rnd(i) * H, len = 200 + rnd(i + 3) * 900; g.fillStyle = "rgba(255,230,190,.7)"; g.fillRect(((s * 1500 + rnd(i + 5) * W) % (W + len)) - len, y, len, 2); } g.restore(); }
+  }
+  if (s >= drop) {
+    const q = seg(s, drop, drop + .5), shake = s < drop + .5 ? (1 - q) * 20 : 0;
+    g.save(); g.translate((rnd(Math.floor(s * 60)) - .5) * shake, (rnd(Math.floor(s * 60) + 3) - .5) * shake);
+    const sc = lerp(2.6, 1, back(q)); g.save(); g.translate(W / 2, 400); g.scale(sc, sc); g.globalAlpha = clamp(q * 3);
+    text("SELECTION SUNDAY", 0, 0, { font: "800 200px BC", ls: "10px", stroke: "rgba(255,214,165,.9)", sw: 8 }); text("SELECTION SUNDAY", 0, 0, { font: "800 200px BC", ls: "10px", fill: "#fff" }); g.restore();
+    text("SEASON " + SEASON, W / 2, 560, { font: "600 70px BC", fill: "#ffd6a5", ls: "40px", alpha: easeOut(seg(s, drop + .3, drop + .9)) });
+    g.restore(); flash(s, drop, 7, .9); sparks(s, drop, W / 2, 400, 120);
+    const hk = s >= 41 * P ? easeOut(seg(s, 41 * P, 41 * P + .4)) : 0;
+    const items = [[25, "68", "TEAMS"], [29, "4", "REGIONS"], [33, "1", "CHAMPION"]];
+    items.forEach(([b, n, label], i) => { const t0 = b * P, k = easeOut(seg(s, t0, t0 + .4)); if (s < t0) return; const x = W / 2 + (i - 1) * 520; g.save(); g.translate(x, 800); g.scale(lerp(1.5, 1, k), lerp(1.5, 1, k)); text(n, 0, 0, { font: "800 150px BC", alpha: k * (1 - hk) }); g.restore(); text(label, x, 890, { font: "600 36px BC", fill: "rgba(255,214,165,.95)", ls: "10px", alpha: k * (1 - hk) }); });
+    const hit = 41 * P; if (s >= hit) { const k = easeOut(seg(s, hit, hit + .5)); g.fillStyle = `rgba(2,5,11,${.55 * k})`; g.fillRect(0, 700, W, 300); text("WHO'S IN?", W / 2, 840, { font: "800 170px BC", ls: "24px", alpha: k, stroke: "rgba(255,214,165,.9)", sw: 6 }); flash(s, hit, 8, .8); }
+  }
+}
+function finaleScene(c, s) {
+  const P = PER(); if (s < P) { background(s, .1 + s / P * .3); return; } s -= P; background(s, .6);
+  const k = easeOut(seg(s, 0, .7)); text("THE FIELD OF 68", W / 2, 96, { font: "800 84px BC", ls: "14px", alpha: k, stroke: "rgba(255,214,165,.85)", sw: 6 });
+  text("SELECTION SUNDAY  ·  SEASON " + SEASON + "  ·  THE FIRST FOUR TIPS OFF ON DAY 48", W / 2, 148, { font: "600 24px B", fill: "rgba(255,214,165,.85)", ls: "8px", alpha: k });
+  const qx = [60, 990], qy = [185, 625], cw = 108, rh = 190;
+  PLAN.regions.forEach((R, ri) => {
+    const x0 = qx[ri % 2], y0 = qy[Math.floor(ri / 2)], teams = FIELD.filter((t) => t.region === R);
+    glass(x0, y0, 870, 410, 22, { alpha: .08, stroke: .4 }); text(R.toUpperCase(), x0 + 24, y0 + 36, { font: "800 34px BC", fill: "#ffd6a5", ls: "8px", align: "left" });
+    SEED_ORDER.forEach((sd, si) => {
+      const col = si % 8, row = Math.floor(si / 8), cx = x0 + 24 + col * 104 + 52, cy = y0 + 70 + row * 168 + 74, cell = teams.filter((t) => t.slotIndex === si);
+      const when = (ri * 16 + si) * P * .22 + .8, a = easeOut(seg(s, when, when + .35)); if (!a) return;
+      g.save(); g.globalAlpha = a; g.translate(cx, cy); g.scale(lerp(1.4, 1, a), lerp(1.4, 1, a)); glass(-50, -70, 100, 150, 12, { alpha: .1, stroke: .5 });
+      if (cell.length === 1) drawLogo(imgs[cell[0].id], 0, -22, 74, 1, false); else cell.forEach((t, k2) => drawLogo(imgs[t.id], (k2 - .5) * 44, -22, 42, 1, false));
+      text(String(sd), 0, 52, { font: "800 38px BC", fill: "#ffd6a5" }); if (cell.length > 1) text("FIRST FOUR", 0, 74, { font: "600 12px BC", fill: "rgba(255,255,255,.6)", ls: "2px" }); g.restore();
+    });
+  });
+  
+  flare(W / 2, 100, Math.exp(-Math.abs(s - 24 * P) * 2) * .6);
+}
+function outsTitleScene(c, s) {
+  if (s < PER()) { background(s, .1, "dark"); return; } s -= PER();
+  background(s, .2, "dark");
+  const k = easeOut(seg(s, .2, 1.4)); text("THE BUBBLE", W / 2, 300, { font: "600 38px BC", fill: "rgba(235,170,180,.95)", ls: "16px", alpha: k });
+  g.save(); g.globalAlpha = k; g.translate(W / 2, H / 2 + 20); g.scale(lerp(1.15, 1, k), lerp(1.15, 1, k)); text("ON THE OUTSIDE", 0, -70, { font: "800 190px BC", ls: "10px" }); text("LOOKING IN", 0, 100, { font: "800 190px BC", ls: "10px", fill: "rgba(235,150,160,.95)" }); g.restore();
+  text("THE LAST EIGHT TEAMS OUT  ·  SEASON " + SEASON, W / 2, H - 170, { font: "600 28px BC", fill: "rgba(255,255,255,.55)", ls: "10px", alpha: seg(s, 1.5, 2.4) });
+  flash(s, 0, 6, .4, "230,150,160");
+}
+function outScene(c, s) {
+  const P = PER(), o = OUTS.find((x) => x.rank === c.rank), last = c.rank === 1, acc = accent[o.id] || "235,150,160";
+  const sl = 1 * P, lg = 3 * P, c0 = 5 * P, c1 = 7 * P, F = (c.beats - (last ? 10 : 6)) * P;
+  const energy = s < sl ? 0 : Math.exp(-(s - sl) * 1.8), shake = s > sl && s < sl + .5 ? (1 - seg(s, sl, sl + .5)) * 14 : 0;
+  g.save(); g.translate((rnd(Math.floor(s * 60)) - .5) * shake, (rnd(Math.floor(s * 60) + 7) - .5) * shake);
+  background(s + o.rank * 3, energy, "dark");
+  const away = easeIn(seg(s, F + .5, F + 1)); g.save(); g.globalAlpha = 1 - away * (last ? 0 : 1);
+  kicker(seg(s, 0, .4), o.group, last ? "THE FIRST TEAM OUT" : "ON THE OUTSIDE LOOKING IN");
+  const k = easeInOut(seg(s, c0, c1));
+  if (s >= sl) {
+    const q = seg(s, sl, sl + .45), sc0 = lerp(3.2, 1, back(q)), sc = lerp(sc0, .19, k), x = lerp(540, 232, k), y = lerp(500, 330, k);
+    if (k > 0) glass(x - 70 - (1 - k) * 40, y - 75, 140 + (1 - k) * 80, 150, 22, { alpha: .16 * k, stroke: .8 * k, tint: "255,190,200" });
+    g.save(); g.translate(x, y); g.scale(sc, sc); g.globalAlpha = clamp(q * 3); g.font = "800 520px BC"; g.textAlign = "center"; g.textBaseline = "middle"; g.lineWidth = 14 / Math.max(sc * 2.4, 1); g.strokeStyle = "rgba(235,150,160,.9)"; g.strokeText(String(o.rank), 0, 0);
+    const nf = g.createLinearGradient(0, -240, 0, 240); nf.addColorStop(0, "#fff"); nf.addColorStop(1, "#c9a0a8"); g.fillStyle = nf; g.fillText(String(o.rank), 0, 0); g.restore();
+    text("OUT", x, lerp(735, 430, k), { font: "600 44px BC", fill: "rgba(235,150,160,.95)", ls: "12px", alpha: clamp(q * 2) });
+  }
+  if (s >= lg) {
+    const q = seg(s, lg, lg + .55), tx = lerp(W + 500, 1250, easeOut(q)), cxL = lerp(tx, 430, k), cyL = lerp(470, 560, k), size = lerp(460, 420, k), sc = lerp(2.4, 1, back(q));
+    g.save(); g.translate(cxL, cyL); g.scale(sc, sc); glass(-size / 2, -size / 2, size, size, 48, { glow: .4 * clamp(q * 1.5), alpha: .1, stroke: .7, glowRGB: acc, tint: "255,230,235" }); drawLogo(imgs[o.id], 0, 0, size * .74); g.restore();
+    const n = seg(s, lg + .3, lg + .8), nm = o.name.toUpperCase(), fs0 = fit(nm, 800, "BC", 1500, 150, 70), fs1 = fit(nm, 800, "BC", 800, 96, 44), fs = lerp(fs0, fs1, k);
+    g.save(); g.font = `800 ${fs}px BC`; g.letterSpacing = "5px"; const nw = g.measureText(nm).width; g.restore();
+    const nx = lerp(W / 2 + 120 - nw / 2, 900, k), ny = lerp(H / 2 + 310, 320, k);
+    g.save(); g.globalAlpha = n; text(nm, nx, ny - (1 - easeOut(n)) * 40, { font: `800 ${fs}px BC`, ls: "5px", align: "left", stroke: "rgba(0,0,0,.6)", sw: 6 });
+    g.globalAlpha = n * (1 - k); text(`${o.rec}   ·   ${o.conf.toUpperCase()}`, W / 2 + 120, H / 2 + 400, { font: "600 40px B", fill: "rgba(235,170,180,.95)", ls: "6px" }); g.restore();
+  }
+  if (s >= c0) {
+    const k2 = easeOut(seg(s, c0, c1)), px = lerp(1000, 860, k2), py = 250, pw = 940, ph = 620;
+    g.save(); g.globalAlpha = k2; glass(px, py, pw, ph, 30, { glow: .15, alpha: .1, stroke: .6, glowRGB: "235,150,160", tint: "255,230,235" });
+    g.beginPath(); g.roundRect(px + 6, py + 6, 8, ph - 12, 4); g.fillStyle = "rgba(235,150,160,.9)"; g.fill();
+    text(`${o.rec}   ·   ${o.conf.toUpperCase()}`, px + 40, py + 140, { font: "600 34px B", fill: "rgba(235,170,180,.95)", align: "left", ls: "4px" });
+    glass(px + 40, py + 176, 250, 44, 22, { alpha: .16, stroke: .6, tint: "255,190,200" }); text(o.group, px + 58, py + 199, { font: "600 24px BC", ls: "4px", align: "left" });
+    g.fillStyle = "rgba(255,255,255,.18)"; g.fillRect(px + 40, py + 240, pw - 80, 2);
+    wrap(o.blurb, "500 34px B", pw - 90).forEach((ln, i) => { const a = easeOut(seg(s, c1 + i * .28, c1 + i * .28 + .5)); text(ln, px + 40, py + 296 + i * 52 - (1 - a) * 14, { font: "500 34px B", fill: "rgba(255,255,255,.94)", align: "left", alpha: a }); });
+    g.restore();
+  }
+  g.restore();
+  if (s >= F) { const st = back(seg(s, F, F + .35)), a = seg(s, F, F + .2); g.save(); g.translate(430, 560); g.rotate(-.18); g.scale(lerp(2.2, 1, st), lerp(2.2, 1, st)); g.globalAlpha = a * .92; g.strokeStyle = "rgba(235,90,100,.95)"; g.lineWidth = 10; g.strokeRect(-190, -62, 380, 124); text("MISSED THE CUT", 0, 2, { font: "800 66px BC", fill: "rgba(235,90,100,.95)", ls: "4px" }); g.restore(); flash(s, F, 12, .4, "235,90,100"); }
+  g.restore(); flash(s, sl, 9, .5, "235,170,180"); sparks(s, sl, 540, 500, 60, "235,150,160");
+}
+function outsBoardScene(c, s) {
+  const P = PER(); background(s, .2, "dark"); const k = easeOut(seg(s, 0, .6));
+  text("OUT OF THE FIELD", W / 2, 100, { font: "800 76px BC", ls: "14px", alpha: k }); text("THE BUBBLE, FINAL ORDER", W / 2, 152, { font: "600 24px B", fill: "rgba(235,170,180,.85)", ls: "8px", alpha: k });
+  [["FIRST FOUR OUT", 4, 1], ["NEXT FOUR OUT", 8, 5]].forEach(([title, hi, lo], ci) => {
+    const x0 = 120 + ci * 880; glass(x0, 210, 820, 740, 26, { alpha: .08, stroke: .45, tint: "255,230,235" }); text(title, x0 + 36, 262, { font: "800 38px BC", fill: "rgba(235,150,160,.95)", ls: "8px", align: "left" });
+    for (let r = lo; r <= hi; r++) { const o = OUTS.find((x) => x.rank === r), i = r - lo, a = easeOut(seg(s, .5 + i * .35, 1 + i * .35)), y = 330 + i * 150; g.save(); g.globalAlpha = a; g.translate(0, (1 - a) * 30);
+      glass(x0 + 30, y, 760, 126, 18, { alpha: .1, stroke: .5, tint: "255,230,235" }); text(String(r), x0 + 76, y + 63, { font: "800 76px BC", fill: "rgba(235,150,160,.95)" }); drawLogo(imgs[o.id], x0 + 176, y + 63, 82, 1, false);
+      const nm = o.name.toUpperCase(), fs = fit(nm, 800, "BC", 470, 44, 26); text(nm, x0 + 240, y + 50, { font: `800 ${fs}px BC`, ls: "2px", align: "left" }); text(`${o.rec}  ·  ${o.conf.toUpperCase()}`, x0 + 240, y + 92, { font: "600 22px B", fill: "rgba(255,255,255,.6)", align: "left", ls: "3px" }); g.restore(); }
+  });
+}
+function outroScene(c, s) {
+  background(s, .5); const k = easeOut(seg(s, .3, 1.6)), m = imgs.mark || imgs.icon;
+  g.save(); g.globalAlpha = k; g.translate(W / 2, 400); g.scale(lerp(.8, 1, k), lerp(.8, 1, k)); if (m) { const ar = m.naturalWidth / m.naturalHeight, h = 340, w = h * ar; g.shadowColor = "rgba(255,214,165,.7)"; g.shadowBlur = 50; g.drawImage(m, -w / 2, -h / 2, w, h); } g.restore();
+  text("THE FIELD IS SET", W / 2, 700, { font: "800 130px BC", ls: "14px", alpha: seg(s, 1, 2) }); text("THE FIRST FOUR TIPS OFF ON DAY 48  ·  THE ROUND OF 64 FOLLOWS ON DAY 49", W / 2, 800, { font: "600 28px BC", fill: "rgba(255,214,165,.95)", ls: "8px", alpha: seg(s, 2, 3) });
+  text("HARDWOOD SIM  ·  SELECTION SUNDAY  ·  SEASON " + SEASON, W / 2, 900, { font: "600 22px B", fill: "rgba(255,255,255,.5)", ls: "6px", alpha: seg(s, 3, 4) });
+  flare(W / 2, 400, Math.exp(-Math.abs(s - 16 * PER()) * 2) * .6);
+}
+const SCENES = { intro: introScene, regionTitle: regionTitleScene, team: teamScene, regionDone: regionDoneScene, finale: finaleScene, outsTitle: outsTitleScene, out: outScene, outsBoard: outsBoardScene, outro: outroScene };
+window.render = function (n, s) {
+  const c = PLAN.clips[n]; g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.clearRect(0, 0, W, H); g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
+  SCENES[c.kind](c, s); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; finish(s, c.dur);
+};
+</script></body></html>

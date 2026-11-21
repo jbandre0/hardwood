@@ -34,3 +34,14 @@ test("with the commissioner's day-47 data, the NCAA games use the official field
   const seed = new Map(data.ncaa.field.map((x) => [x.team, x]));
   for (const g of ncaa.filter((g) => g.day === 48)) assert.equal(seed.get(g.a).ff, seed.get(g.b).ff, "First Four pairs match the official field");
 });
+
+test("an official field published in data/official-fields.json (a season made in the browser) is adopted the same way", async () => {
+  const data = await loadSeasonData("season-2", async (p) => readJSON(p));
+  const pub = { official: true, field: data.ncaa.field.map((x) => ({ team: x.team, seed: x.seed, region: x.region, ff: x.ff || null })) };
+  const st = createState({ ...data, ncaa: null, officialField: pub }, { format: 1, games: {}, box: {}, order: [], content: {} });
+  assert.equal(key(st.content.field), key(data.ncaa.field));
+  assert.ok(st.contentDirty.has("field"));
+  assert.equal(adoptOfficialField(st), false, "idempotent");
+  const started = createState({ ...data, ncaa: null, officialField: pub });                 // no overlay: nothing played, adopted too
+  assert.equal(key(started.content.field), key(data.ncaa.field));
+});

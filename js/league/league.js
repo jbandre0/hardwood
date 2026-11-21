@@ -17,6 +17,9 @@ export async function loadSeasonData(id, loader, files = FILES) {
   out.league = await loader("data/league.json");
   // weekly bracketology editions published to the repo (data/editions.json, keyed by season id)
   try { out.editions = ((await loader("data/editions.json")) || {})[id] || []; } catch { out.editions = []; }
+  // the committee's official NCAA field for a season made in the browser (data/official-fields.json, keyed by season id; a
+  // season imported from Excel keeps it in its own ncaa.json instead). Shape: { official: true, field: [{team, seed, region, ff}] }
+  try { out.officialField = ((await loader("data/official-fields.json")) || {})[id] || null; } catch { out.officialField = null; }
   // Bracketology HQ's bracket-challenge entry (data/challenge.json, keyed by season id)
   try { out.challenge = ((await loader("data/challenge.json")) || {})[id] || null; } catch { out.challenge = null; }
   return out;
@@ -258,12 +261,12 @@ export function setContent(state, key, value) {
 
 
 /**
- * The committee's official field (a baseline ncaa.json with "official": true, published to the repo after Selection
- * Sunday) replaces a field built in the browser, as long as no NCAA game has been played yet. Once the tournament is
+ * The committee's official field (a baseline ncaa.json with "official": true, or data/official-fields.json for a season made
+ * in the browser, published to the repo after Selection Sunday) replaces a field built in the browser, as long as no NCAA game has been played yet. Once the tournament is
  * under way the field in use is never swapped.
  */
 export function adoptOfficialField(state) {
-  const pub = state.data.ncaa;
+  const pub = state.data.ncaa && state.data.ncaa.official ? state.data.ncaa : state.data.officialField;
   if (!pub || !pub.official || !pub.field || pub.field.length !== 68) return false;
   if (state.games.some((g) => g.type === "NCAA" && g.ptsA != null)) return false;
   const key = (f) => f.map((x) => `${x.team}|${x.seed}|${x.region}|${x.ff || 0}`).sort().join(",");

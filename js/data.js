@@ -77,9 +77,9 @@ async function buildCore(seasonId) {
     const b = await loadLocalSeason(id);
     if (!b) throw new Error(`${info.label} is missing from this browser's storage. Restore it from a backup file on the Commissioner desk.`);
     const own = (await leagueMode()) === "mine";
-    // a visitor's league never picks up the commissioner's published editions or bracket-challenge entry
+    // a visitor's league never picks up the commissioner's published editions, official NCAA field or bracket-challenge entry
     loader = (p) => (p.startsWith(`data/seasons/${id}/`) ? Promise.resolve(b.files[p.slice(`data/seasons/${id}/`.length, -5)] ?? Promise.reject(new Error("missing")))
-      : own && (p === "data/editions.json" || p === "data/challenge.json") ? Promise.resolve({}) : fetchJSON(p));
+      : own && (p === "data/editions.json" || p === "data/challenge.json" || p === "data/official-fields.json") ? Promise.resolve({}) : fetchJSON(p));
   }
   const [data, overlay, logos] = await Promise.all([loadSeasonData(id, loader, info && info.files), loadOverlay(id).catch(() => null), getJSON("logos").catch(() => ({}))]);
   LOGOS = logos;

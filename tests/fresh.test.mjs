@@ -8,7 +8,7 @@ import { playOut } from "./helpers/playout.mjs";
 // what a brand-new browser builds for its own league
 const src = Object.fromEntries(await Promise.all(FRESH_FILES.map(async ([k, p]) => [k, await readJSON(p)])));
 const fresh = buildFreshSeason1(src);
-const load = () => loadSeasonData("season-1", async (p) => (p.startsWith("data/seasons/season-1/") ? fresh.files[p.slice(22, -5)] ?? Promise.reject(new Error("missing")) : p.endsWith("editions.json") || p.endsWith("challenge.json") ? {} : readJSON(p)),
+const load = () => loadSeasonData("season-1", async (p) => (p.startsWith("data/seasons/season-1/") ? fresh.files[p.slice(22, -5)] ?? Promise.reject(new Error("missing")) : p.endsWith("editions.json") || p.endsWith("challenge.json") || p.endsWith("official-fields.json") ? {} : readJSON(p)),
   ["teams", "games", "box", "settings", "marquee", "polls", "bracketology", "meta"]);
 
 test("a fresh Season 1 has the commissioner's Season 1 teams, tiers, starting lines and schedule, and nothing played", async () => {

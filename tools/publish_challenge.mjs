@@ -27,7 +27,10 @@ if (season !== X.season.id) errors.push(`Draft is for ${season} but the export i
 // export's field, the same way the site adopts it over a field built in the browser.
 const officialPath = path.join(ROOT, `data/seasons/${draft.season}/ncaa.json`);
 const official = fs.existsSync(officialPath) ? JSON.parse(fs.readFileSync(officialPath, "utf8")) : null;
-const field = official && official.official && official.field && official.field.length === 68 ? official.field : X.ncaaField;
+// a season made in the browser keeps its official field in data/official-fields.json (keyed by season id) instead
+const offAll = fs.existsSync(path.join(ROOT, "data/official-fields.json")) ? JSON.parse(fs.readFileSync(path.join(ROOT, "data/official-fields.json"), "utf8")) : {};
+const pub = official && official.official ? official : offAll[draft.season || X.season.id] || null;
+const field = pub && pub.official && pub.field && pub.field.length === 68 ? pub.field : X.ncaaField;
 if (!field || field.length !== 68) errors.push("The NCAA field isn't set in this export yet (Commissioner desk: Build NCAA field after day 47), so there is no bracket to fill in.");
 const picks = {};
 for (const [id, name] of Object.entries(draft.winners || {})) { if (+id < PICK_FROM) continue; const ff = /^first four ([1-4])$/i.exec(String(name).trim()); picks[+id] = ff ? -+ff[1] : idOf(name); }

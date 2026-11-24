@@ -14,7 +14,7 @@ import { dayRecap, dayDone } from "../league/recap.js";
     if (!dayDone(state, day)) day = Math.max(1, day - 1);
     const R = dayRecap(state, day);
     const pct = (p) => `${Math.round(p * 100)}%`;
-    const score = (g) => { const aw = g.ptsA > g.ptsB; return `<tr><td>${teamLink(teams[g.a])}</td><td class="r num ${aw ? "w" : "muted"}">${g.ptsA}</td><td class="faint c">${g.home ? "at" : "vs"}</td><td>${teamLink(teams[g.b])}</td><td class="r num ${aw ? "muted" : "w"}">${g.ptsB}</td><td>${g.ot ? `<span class="pill">${g.ot > 1 ? g.ot : ""}OT</span>` : ""}${g.pWin < 0.3 ? ' <span class="pill warm">upset</span>' : ""}</td><td class="muted">${esc(roundOf(g))}</td></tr>`; };
+    const score = (g) => { const aw = g.ptsA > g.ptsB; return `<tr><td class="${aw ? "wcell" : ""}">${teamLink(teams[g.a])}</td><td class="r num ${aw ? "w wcell" : "muted"}">${g.ptsA}</td><td class="faint c">${g.home ? "at" : "vs"}</td><td class="${aw ? "" : "wcell"}">${teamLink(teams[g.b])}</td><td class="r num ${aw ? "muted" : "w wcell"}">${g.ptsB}</td><td>${g.ot ? `<span class="pill">${g.ot > 1 ? g.ot : ""}OT</span>` : ""}${g.pWin < 0.3 ? ' <span class="pill warm">upset</span>' : ""}</td><td class="muted">${esc(roundOf(g))}</td></tr>`; };
     const mv = (x) => x.prev == null ? '<span class="pill warm">NEW</span>' : x.prev === x.rank ? '<span class="faint">—</span>' : x.prev > x.rank ? `<span class="up">▲ ${x.prev - x.rank}</span>` : `<span class="down">▼ ${x.rank - x.prev}</span>`;
     const top = R.upsets[0];
     const finished = !R.nextDay;

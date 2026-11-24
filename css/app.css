@@ -149,6 +149,8 @@ td.r, th.r { text-align: right; } td.c, th.c { text-align: center; }
 .rank { font: 800 1.15rem var(--display); color: var(--muted); width: 40px; }
 .up { color: var(--win); } .down { color: var(--loss); }
 .w { color: var(--win); font-weight: 600; } .l { color: var(--loss); font-weight: 600; }
+/* winner of a game in results lists: light green cell behind the name and score */
+td.wcell { background: color-mix(in srgb, var(--accent) 30%, transparent); } td.wcell a { font-weight: 700; }
 .bar-cell { display: flex; align-items: center; gap: 10px; min-width: 120px; }
 .bar-cell i { display: block; height: 6px; border-radius: 4px; background: var(--accent); }
 .bar-cell span { font-variant-numeric: tabular-nums; min-width: 38px; text-align: right; }

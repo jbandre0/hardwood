@@ -9,7 +9,7 @@ const keysIn = (p, db) => p.evaluate((db) => new Promise((res) => { const r = in
   const b = await chromium.launch();
   // ---- a visitor: nothing saved in this browser
   const ctx = await b.newContext({ viewport: { width: 1440, height: 1000 } });
-  await ctx.addInitScript(() => { try { localStorage.setItem('hw-pred-on', '0'); } catch (e) {} });
+  await ctx.addInitScript(() => { try {  } catch (e) {} });
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', (e) => errs.push(e.message)); p.on('dialog', (d) => d.accept());
   await p.goto(BASE + 'index.html', { waitUntil: 'networkidle' }); await p.waitForTimeout(400);
   ok(await p.evaluate(() => localStorage.getItem('hw-league')) === 'mine', 'a new browser opens its own league');

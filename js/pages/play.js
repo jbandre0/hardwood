@@ -12,7 +12,10 @@ import { folderSupported, pickFolder, forgetFolder, savedFolder, folderPermissio
 import { saveOverlay, clearOverlay, exportAll, importAll, loadOverlay, unsavedSince, protectStorage, leagueModeNow } from "../league/store.js";
 
 const seed = () => crypto.getRandomValues(new Uint32Array(1))[0];
-const predOn = () => { try { return localStorage.getItem("hw-pred-on") !== "0"; } catch { return true; } };
+// Predictions (thousands of extra sims per game, scored on the Predictions page) are opt-in: the game itself is always
+// one roll. Off by default since Season 4; a new key so browsers that never chose start with it off.
+const PRED_KEY = "hw-predict";
+const predOn = () => { try { return localStorage.getItem(PRED_KEY) === "1"; } catch { return false; } };
 const predSims = () => { try { return +localStorage.getItem("hw-pred-sims") || DEFAULT_SIMS; } catch { return DEFAULT_SIMS; } };
 const fmt = (n) => n.toLocaleString();
 // One seed per game until it is logged: Play game, Watch game and "leave and come back" are all the same game.
@@ -93,7 +96,7 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
           ${mine.length ? `<div class="card plain"><div class="card-head"><h2>Recorded on this site</h2><span class="muted">latest ${mine.length} of ${state.recorded.length}</span></div>
             <div class="table-wrap"><table><thead><tr><th>Day</th><th>Visitor</th><th class="r">Pts</th><th>Host</th><th class="r">Pts</th><th></th></tr></thead><tbody>
               ${mine.map((id) => { const g = games.find((x) => x.id === id); const a = teams[g.a], b = teams[g.b], bx = state.box.get(id); const aw = g.ptsA > g.ptsB;
-                return `<tr data-id="${id}" class="clickable"><td class="muted num">${g.day}</td><td>${teamLink(a)}</td><td class="r num ${aw ? "w" : "muted"}">${g.ptsA}</td><td>${teamLink(b)}</td><td class="r num ${aw ? "muted" : "w"}">${g.ptsB}</td><td>${bx[1] ? `<span class="pill">${bx[1] > 1 ? bx[1] : ""}OT</span>` : ""}</td></tr>`; }).join("")}
+                return `<tr data-id="${id}" class="clickable"><td class="muted num">${g.day}</td><td class="${aw ? "wcell" : ""}">${teamLink(a)}</td><td class="r num ${aw ? "w wcell" : "muted"}">${g.ptsA}</td><td class="${aw ? "" : "wcell"}">${teamLink(b)}</td><td class="r num ${aw ? "muted" : "w wcell"}">${g.ptsB}</td><td>${bx[1] ? `<span class="pill">${bx[1] > 1 ? bx[1] : ""}OT</span>` : ""}</td></tr>`; }).join("")}
             </tbody></table></div></div>` : ""}
         </div>
 
@@ -105,7 +108,7 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
             <div class="seg" id="engineSeg" role="group" aria-label="Engine version"><button type="button" data-v="v10" class="${engineVersion(state) === "v10" ? "on" : ""}">v10</button><button type="button" data-v="v9" class="${engineVersion(state) === "v9" ? "on" : ""}">v9</button></div></div>`}
           ${complete ? "" : `<div class="card">
             <div class="card-head"><h2>Predictions</h2><a href="predictions.html">Scorecard</a></div>
-            <p class="muted" style="margin-top:0;font-size:.9rem">Before a game is played, the engine's prediction is locked and later scored. ${state.predictions.size.toLocaleString()} locked so far.</p>
+            <p class="muted" style="margin-top:0;font-size:.9rem">Games are always played once, and that result counts. Optionally, the engine can also lock a prediction before each game (thousands of extra sims) to be scored later. Off by default: it slows every day down. ${state.predictions.size.toLocaleString()} locked so far.</p>
             <label style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><input type="checkbox" id="predOn" ${predOn() ? "checked" : ""}> Lock predictions before playing</label>
             <div class="field"><label for="predSims">Simulations per prediction</label><div id="cbSims"></div></div>
             <p class="faint" style="margin:8px 0 0;font-size:.8rem">More simulations = steadier numbers, slower days. 3,000 takes about 5-10 seconds a day.</p></div>`}
@@ -176,7 +179,7 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
     document.getElementById("staleDl")?.addEventListener("click", async () => { const blob = new Blob([JSON.stringify(await exportAll())], { type: "application/json" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `hardwood-old-${season.id}-data.json`; a.click(); });
     document.getElementById("staleDrop")?.addEventListener("click", async () => { if (!confirm(`Discard the older ${season.label} data saved in this browser? The imported season is not affected.`)) return; await clearOverlay(season.id); last = null; await render(); });
     document.querySelectorAll("#engineSeg button").forEach((b) => b.addEventListener("click", async () => { if (b.dataset.v === engineVersion(state)) return; setContent(state, "engine", b.dataset.v); await persist(); clearPending(season.id); await render(); const f = document.querySelector(".rail-foot"); if (f) f.innerHTML = `Engine ${b.dataset.v} &middot; 40,000 sims per matchup`; }));
-    document.getElementById("predOn")?.addEventListener("change", (e) => { try { localStorage.setItem("hw-pred-on", e.target.checked ? "1" : "0"); } catch { /* ignore */ } });
+    document.getElementById("predOn")?.addEventListener("change", (e) => { try { localStorage.setItem(PRED_KEY, e.target.checked ? "1" : "0"); } catch { /* ignore */ } });
     const simsBox = document.getElementById("cbSims");
     if (simsBox) combobox(simsBox, { id: "predSims", value: String(predSims()), searchable: false, options: [1000, 2000, 3000, 5000, 10000, 40000].map((n) => ({ value: String(n), label: n.toLocaleString() + (n === 40000 ? " (backtest standard, slow)" : "") })), onChange: (v) => { try { localStorage.setItem("hw-pred-sims", v); } catch { /* ignore */ } } });
     document.getElementById("lockField")?.addEventListener("click", async () => {

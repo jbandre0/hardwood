@@ -1,5 +1,5 @@
 """Builds the soundtrack for the reveal: the commissioner's track looped on the beat, ducked under the reveals, plus synthesized effects.
-usage: python3 make_audio.py <plan.json> <music.m4a> <out.wav>
+usage: python3 make_audio.py <plan.json> <music.m4a | synth> <out.wav>   ("synth": no track, a synthesized score on the beat grid)
 The track is ~180 BPM; its body repeats cleanly every 80 beats. Video t=0 sits on music t=0.203 (beat 0) so every clip start is on a bar line."""
 import sys, json, subprocess
 import numpy as np
@@ -12,10 +12,12 @@ LS = T0 + 16 * PER              # loop start (beat 16), phase-aligned
 LE = T0 + 96 * PER              # loop end (beat 96): 80 beats of body
 XF = 0.30                       # crossfade at loop joins
 
-raw = subprocess.run(["ffmpeg", "-v", "error", "-i", music_path, "-f", "f32le", "-ac", "2", "-ar", str(SR), "-"], capture_output=True).stdout
-mus = np.frombuffer(raw, dtype=np.float32).reshape(-1, 2).T.copy()      # (2, n)
-print("music loaded", mus.shape[1] / SR, "s")
 N = int((TOTAL + 2.0) * SR)
+SYNTH = music_path == "synth"      # no track supplied: a synthesized score on the same beat grid (every slam still lands on a beat)
+if not SYNTH:
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", music_path, "-f", "f32le", "-ac", "2", "-ar", str(SR), "-"], capture_output=True).stdout
+    mus = np.frombuffer(raw, dtype=np.float32).reshape(-1, 2).T.copy()      # (2, n)
+    print("music loaded", mus.shape[1] / SR, "s")
 bed = np.zeros((2, N), dtype=np.float32)
 def put(dst, src, at):
     a = int(round(at * SR)); b = a + src.shape[-1]
@@ -25,22 +27,92 @@ def seg(a, b): return mus[:, int(round(a * SR)):int(round(b * SR))]
 def fade(n, up=True):
     x = np.linspace(0, 1, n, dtype=np.float32); return np.sin(x * np.pi / 2) if up else np.cos(x * np.pi / 2)
 
-# ---- music bed: intro (first 4 bars of the track), then the 80-beat body on repeat, then the track's own ending under the outro
-outro = [c for c in clips if c["kind"] == "outro"][0]; T_out = outro["start"]
-T_body = 16 * PER                                         # video time where the body begins (the drop)
-put(bed, seg(T0, LS), 0.0)
-L = LE - LS; t = T_body; first = True
-while t < T_out - 1e-6:
-    piece_len = min(L, T_out - t)
-    body = seg(LS, LS + piece_len + (XF if piece_len == L else 0)).copy()
-    n = body.shape[1]; xf = int(XF * SR)
-    if not first and n > xf: body[:, :xf] *= fade(xf, True)
-    if piece_len == L and n > xf: body[:, -xf:] *= fade(xf, False)
-    put(bed, body, t); t += piece_len; first = False
-end = seg(LE, LE + outro["dur"] + 3.0).copy(); xf = int(XF * SR); end[:, :xf] *= fade(xf, True)
-# the last loop piece ends at T_out with no tail fade-out (the ending takes over); trim any tail we added
-put(bed, end, T_out)
-fo = int(2.0 * SR); a = int((T_out + outro["dur"] - 0.2) * SR) - fo; bed[:, a:a + fo] *= np.linspace(1, 0, fo, dtype=np.float32); bed[:, a + fo:] = 0
+def synth_score():
+    """Half-time cinematic pulse at the plan's tempo: pads + bass on Am-F-C-G (two bars each), kick/clap/hats from the drop,
+    a filtered build in the intro, a sparse outro. Deterministic."""
+    rs = np.random.default_rng(11); bed = np.zeros((2, N), dtype=np.float32); beat = PER
+    T_body = 16 * PER; outro = [c for c in clips if c["kind"] == "outro"][0]; T_out = outro["start"]; T_end = T_out + outro["dur"]
+    def tone(freqs, dur, amp, att=.02, rel=.4, kind="saw"):
+        u = np.arange(int(dur * SR)) / SR; out = np.zeros_like(u)
+        for k, f in enumerate(freqs):
+            for det in (-0.07, 0.07):
+                ph = 2 * np.pi * f * (1 + det / 100) * u + k
+                out += (2 * ((ph / (2 * np.pi)) % 1) - 1) * .5 if kind == "saw" else np.sin(ph)
+        e = np.minimum(1, u / att) * np.minimum(1, np.maximum(0, (dur - u) / rel)); return (out * e * amp / max(1, len(freqs))).astype(np.float32)
+    def lp(x, fc):   # one-pole low-pass, applied twice
+        a = np.exp(-2 * np.pi * fc / SR); y = np.empty_like(x); z = 0.0
+        for _ in range(2):
+            y = np.empty_like(x); z = 0.0
+            # vectorised via lfilter-like cumulative trick is overkill here; segments are short
+            for i in range(0, len(x), 4096):
+                seg_ = x[i:i + 4096]; out = np.empty_like(seg_)
+                for k in range(len(seg_)): z = (1 - a) * seg_[k] + a * z; out[k] = z
+                y[i:i + 4096] = out
+            x = y
+        return y
+    def kick():
+        u = np.arange(int(.45 * SR)) / SR; f = 45 + 110 * np.exp(-u * 28); return (np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-u * 7) * .9).astype(np.float32)
+    def clap():
+        u = np.arange(int(.3 * SR)) / SR; n = rs.uniform(-1, 1, len(u)); n = n - np.concatenate([[0], n[:-1]]) * .9; return (n * np.exp(-u * 18) * .28).astype(np.float32)
+    def hat(open_=False):
+        u = np.arange(int((.18 if open_ else .05) * SR)) / SR; n = rs.uniform(-1, 1, len(u)); n = n - np.concatenate([[0], n[:-1]]); return (n * np.exp(-u * (14 if open_ else 70)) * .08).astype(np.float32)
+    A3, C4, E4, F3, G3, D4, B3 = 220.0, 261.63, 329.63, 174.61, 196.0, 293.66, 246.94
+    chords = [(A3, C4, E4), (F3, A3, C4), (C4, E4, 392.0), (G3, B3, D4)]; roots = [55.0, 43.65, 65.41, 49.0]
+    bar = 4 * beat; prog = 2 * bar
+    # pre-render one chord's pad and bass (cheap: 4 chords x 2 bars)
+    pads = [tone(ch, prog + .6, .16, att=.25, rel=.5) for ch in chords]
+    pads = [lp(p_, 1800.0) for p_ in pads]
+    bass = []
+    for r in roots:
+        one = np.zeros(int((prog + .3) * SR), dtype=np.float32)
+        for k in range(4):     # a bass note every 2 beats across the chord's two bars
+            nt = tone([r], 2 * beat * .9, .5, att=.005, rel=.08, kind="sin") + tone([r * 2], 2 * beat * .9, .08, att=.005, rel=.08)
+            a0 = int(k * 2 * beat * SR); one[a0:a0 + len(nt)] += nt[: len(one) - a0]
+        bass.append(one)
+    K, CL, HC, HO = kick(), clap(), hat(), hat(True)
+    def put1(dst, src, at, gain=1.0, pan=0.0):
+        a0 = int(round(at * SR)); b0 = min(N, a0 + len(src))
+        if a0 >= N or b0 <= 0: return
+        s_ = src[: b0 - a0] * gain; dst[0, a0:b0] += s_ * (1 - max(0, pan) * .5); dst[1, a0:b0] += s_ * (1 + min(0, pan) * .5)
+    t, ci = 0.0, 0
+    while t < T_end:
+        intro = t < T_body; out_ = t >= T_out
+        g = (0.35 + 0.65 * t / T_body) if intro else (0.7 if out_ else 1.0)
+        put1(bed, pads[ci % 4], t, g * (1.15 if intro else 1.0)); put1(bed, pads[ci % 4], t + .011, g * .5, .8)
+        if not intro: put1(bed, bass[ci % 4], t, .9 if not out_ else .5)
+        for b in range(8):
+            tb = t + b * beat
+            if tb >= T_end: break
+            if not intro and not out_:
+                if b % 2 == 0: put1(bed, K, tb, 1.0)
+                if b % 4 == 2: put1(bed, CL, tb, 1.0, .1)
+                put1(bed, HC, tb, 1.0, -.3); put1(bed, HC, tb + beat / 2, .7, .3)
+                if b == 7: put1(bed, HO, tb + beat / 2, 1.0, .2)
+            elif intro and t + b * beat >= T_body - 4 * beat:
+                put1(bed, K, tb, .5 + .5 * (tb - (T_body - 4 * beat)) / (4 * beat))
+        t += prog; ci += 1
+    fo = int(3.0 * SR); a0 = int(T_end * SR) - fo; bed[:, a0:a0 + fo] *= np.linspace(1, 0, fo, dtype=np.float32)[None, : bed[:, a0:a0 + fo].shape[1]]; bed[:, a0 + fo:] = 0
+    return bed * .3
+
+if SYNTH:
+    bed = synth_score(); print("synthesized score")
+else:
+    # ---- music bed: intro (first 4 bars of the track), then the 80-beat body on repeat, then the track's own ending under the outro
+    outro = [c for c in clips if c["kind"] == "outro"][0]; T_out = outro["start"]
+    T_body = 16 * PER                                         # video time where the body begins (the drop)
+    put(bed, seg(T0, LS), 0.0)
+    L = LE - LS; t = T_body; first = True
+    while t < T_out - 1e-6:
+        piece_len = min(L, T_out - t)
+        body = seg(LS, LS + piece_len + (XF if piece_len == L else 0)).copy()
+        n = body.shape[1]; xf = int(XF * SR)
+        if not first and n > xf: body[:, :xf] *= fade(xf, True)
+        if piece_len == L and n > xf: body[:, -xf:] *= fade(xf, False)
+        put(bed, body, t); t += piece_len; first = False
+    end = seg(LE, LE + outro["dur"] + 3.0).copy(); xf = int(XF * SR); end[:, :xf] *= fade(xf, True)
+    # the last loop piece ends at T_out with no tail fade-out (the ending takes over); trim any tail we added
+    put(bed, end, T_out)
+    fo = int(2.0 * SR); a = int((T_out + outro["dur"] - 0.2) * SR) - fo; bed[:, a:a + fo] *= np.linspace(1, 0, fo, dtype=np.float32); bed[:, a + fo:] = 0
 
 # ---- darker section (last teams out): low-pass the bed there, crossfaded over a second at each edge
 d0 = [c for c in clips if c["kind"] == "outsTitle"][0]["start"]; d1 = [c for c in clips if c["kind"] == "outsBoard"][0]; d1 = d1["start"] + d1["dur"]

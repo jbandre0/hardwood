@@ -1,8 +1,9 @@
 // Builds plan.json: the clip timeline, in whole beats of the soundtrack (so every slam lands on a beat), plus sound-effect events.
-// usage: node make_plan.mjs <dir containing field.json and outs.json>
+// usage: node make_plan.mjs <dir containing field.json and outs.json> <season number, e.g. 4>
 import fs from "node:fs";
 import path from "node:path";
-const dir = process.argv[2];
+const dir = process.argv[2], season = process.argv[3];
+if (!season) throw new Error("usage: node make_plan.mjs <dir> <season number>");
 const field = JSON.parse(fs.readFileSync(path.join(dir, "field.json"), "utf8")), outs = JSON.parse(fs.readFileSync(path.join(dir, "outs.json"), "utf8"));
 const PER = 0.3328, REGIONS = ["East", "South", "West", "Midwest"];
 const bars = (n) => n * 4, ceil4 = (b) => Math.ceil(b / 4) * 4;
@@ -35,6 +36,6 @@ add({ kind: "outsBoard", beats: bars(5), mood: "dark", ev: [{ b: 0, k: "swish" }
 add({ kind: "outro", beats: bars(8), ev: [{ b: 0, k: "swish" }, { b: 4, k: "shimmer" }, { b: 16, k: "hit" }] });
 
 let t = 0; clips.forEach((c, i) => { c.n = i; c.start = +t.toFixed(4); t += c.dur; });
-fs.writeFileSync(path.join(dir, "plan.json"), JSON.stringify({ PER, regions: REGIONS, total: +t.toFixed(3), clips }, null, 1));
+fs.writeFileSync(path.join(dir, "plan.json"), JSON.stringify({ season, PER, regions: REGIONS, total: +t.toFixed(3), clips }, null, 1));
 const kinds = {}; clips.forEach((c) => { kinds[c.kind] = (kinds[c.kind] || 0) + 1; });
 console.log("clips:", clips.length, JSON.stringify(kinds), "| total", (t / 60).toFixed(1), "min | longest team clip", Math.max(...clips.filter((c) => c.kind === "team").map((c) => c.dur)).toFixed(1) + "s");

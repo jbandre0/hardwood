@@ -15,12 +15,14 @@ canvas { display: block; }
 const W = 1920, H = 1080, cv = document.getElementById("c"), g = cv.getContext("2d");
 const D = new URLSearchParams(location.search).get("d") || "data";
 let FIELD, OUTS, PLAN; const imgs = {}, accent = {}, warnings = [];
-const SEASON = new URLSearchParams(location.search).get("season") || "3";
+let SEASON = new URLSearchParams(location.search).get("season") || "";   // ?season= wins, else plan.json's season
 window.warnings = warnings;
 const loadImg = (src) => new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => { warnings.push("missing image " + src); res(null); }; i.src = src; });
 window.ready = (async () => {
   [FIELD, OUTS, PLAN] = await Promise.all(["field", "outs", "plan"].map((n) => fetch(`${D}/${n}.json`).then((r) => r.json())));
   FIELD.forEach((t, i) => { t._i = i; });
+  if (!SEASON) SEASON = String(PLAN.season || "");
+  if (!SEASON) warnings.push("no season number: pass make_plan.mjs <dir> <season>");
   await Promise.all([document.fonts.load("800 100px BC"), document.fonts.load("600 100px BC"), document.fonts.load("600 40px B"), document.fonts.load("500 40px B")]);
   const all = [...FIELD, ...OUTS];
   await Promise.all([...all.map(async (t) => { imgs[t.id] = await loadImg(t.logo); if (imgs[t.id]) accent[t.id] = dominant(imgs[t.id]); }), loadImg("assets/brand/hardwood-mark.png").then((i) => { imgs.mark = i; }), loadImg("assets/brand/icon-512.png").then((i) => { imgs.icon = i; })]);

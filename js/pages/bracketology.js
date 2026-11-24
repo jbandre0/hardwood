@@ -1,7 +1,7 @@
 import { shell, fail } from "../ui.js";
 import { loadCore, resetCores, esc, teamLinkPlain as teamLink, articleHTML, signed } from "../data.js";
 import { combobox } from "../combobox.js";
-import { computeBoard } from "../league/bracketology.js";
+import { computeBoard, BOARD_DEFAULTS } from "../league/bracketology.js";
 import { suggestField, validateField, movement, fieldChanges, REGIONS } from "../league/field.js";
 import { setContent, toOverlay } from "../league/league.js";
 import { saveOverlay } from "../league/store.js";
@@ -12,7 +12,7 @@ import { downloadSeasonExport } from "../export-download.js";
   try {
     const core = await loadCore();
     const { state, teams, season } = core;
-    const S = core.data.bracketology?.settings || { q1Rank: 25, q2Rank: 50, badLossRank: 100, winWeight: 8, q1Pts: 1.5, q2Pts: 0.75, badLossPts: 1.5, atLarge: 37, seedBump: 2 };
+    const S = { ...BOARD_DEFAULTS, ...core.data.bracketology?.settings };
     const picksAll = () => state.content.picks;
     const weeks = () => [...new Set(picksAll().map((p) => p.week))].sort((a, b) => a - b);
     let week = weeks().length ? weeks()[weeks().length - 1] : null;
@@ -37,7 +37,7 @@ import { downloadSeasonExport } from "../export-download.js";
       const val = week != null ? validateField(cur, (id) => teams[id] && teams[id].conf) : { errors: [], warnings: [] };
       view.innerHTML = `
         <div class="page-title"><span class="kicker">${esc(season.label)}</span><h1>Bracketology</h1>
-          <p>The weekly projected field. Seeds come from a committee score: power rating, win percentage, quadrant wins and bad losses.</p></div>
+          <p>The weekly projected field. Seeds come from a committee score: half power rating (how good you are), half résumé rating (wins above bubble: what you've earned).</p></div>
         <div class="card" style="margin-bottom:18px"><div class="btn-row">
           ${wk.length ? `<div class="field" style="min-width:180px"><label for="wk">Week</label><div id="cbWk"></div></div>` : ""}
           <button class="btn ghost" id="edit" type="button">${editing ? "Close editor" : "Edit / new week"}</button>

@@ -3,6 +3,7 @@ import { combobox } from "../combobox.js";
 import { loadCore, resetCores, esc, teamLink, signed, recordAsOf } from "../data.js";
 import { setContent, toOverlay } from "../league/league.js";
 import { saveOverlay } from "../league/store.js";
+import { computeResume } from "../league/resume.js";
 
 (async function main() {
   const view = shell("rankings");
@@ -10,12 +11,12 @@ import { saveOverlay } from "../league/store.js";
     const core = await loadCore();
     let tab = location.hash === "#ap" ? "ap" : location.hash === "#poll" ? "poll" : "power";
     let editing = null;   // draft ballot being edited
-    const st = { sort: "rank", dir: 1, conf: "", tier: "" };
+    const st = { sort: "rank", dir: 1, conf: "", tier: "", mode: location.hash === "#resume" ? "resume" : "power" };
     let week = Math.max(0, core.polls.length - 1);
 
     view.innerHTML = `
       <div class="page-title"><span class="kicker">${esc(core.season.label)} ${core.season.status === "complete" ? "final" : "&middot; through day " + core.season.day}</span><h1>Rankings</h1>
-        <p>Power ratings come from the sim itself: average margin plus the strength of everyone you played, solved for all 365 teams at once. The AP Top 25 is the committee's weekly poll.</p></div>
+        <p>Power ratings say how good a team is: average margin plus the strength of everyone it played, solved for all 365 teams at once. Résumé ratings say what it has earned: wins above bubble, quadrant by quadrant. The AP Top 25 is the committee's weekly poll.</p></div>
       <div class="seg" style="margin-bottom:16px" id="tabs"><button type="button" data-t="power">Power ratings</button><button type="button" data-t="ap">AP Top 25</button><button type="button" data-t="poll">Power Poll</button></div>
       <div class="card plain" id="panel"></div>`;
     const panel = document.getElementById("panel");
@@ -27,7 +28,23 @@ import { saveOverlay } from "../league/store.js";
     ];
     const val = (t, k) => (k === "name" ? t.name : k === "conf" ? t.conf : k === "tier" ? t.tier : k === "w" ? t.w / Math.max(1, t.w + t.l) : k === "vsTier" ? t.rating - t.tierRating : t[k]);
 
+    // Résumé view: Wins Above Bubble and NET-style quadrants (js/league/resume.js), computed once per page load
+    let resume = null;
+    const resumeOf = () => resume ??= (() => {
+      const R = computeResume({ teams: core.teams.map((t) => ({ id: t.id, rating: t.rating, eff: t.eff })), games: core.state.games });
+      const powerRank = new Map([...core.teams].filter((t) => t.gp).sort((a, b) => b.rating - a.rating).map((t, i) => [t.id, i + 1]));
+      return { ...R, powerRank };
+    })();
+    const RCOLS = [
+      ["rank", "#", null, "c"], ["name", "Team", null], ["conf", "Conf", null], ["tier", "Tier", null], ["w", "Record", null, "r"],
+      ["q1", "Q1", null, "r"], ["q2", "Q2", null, "r"], ["q3", "Q3", null, "r"], ["q4", "Q4", null, "r"], ["prank", "Power #", null, "r"], ["wab", "WAB", null, "r"],
+    ];
+    const rval = (t, k) => { const x = resumeOf().rows[t.id];
+      return k === "rank" ? (x.rank ?? 9999) : k === "wab" ? x.wab : k === "prank" ? (resumeOf().powerRank.get(t.id) ?? 9999) : /^q\d$/.test(k) ? x.q[+k[1] - 1][0] - x.q[+k[1] - 1][1] / 100 : val(t, k); };
+    const modeSeg = () => `<div class="field" style="align-self:end"><div class="seg" id="mode"><button type="button" data-m="power" class="${st.mode === "power" ? "on" : ""}">Power</button><button type="button" data-m="resume" class="${st.mode === "resume" ? "on" : ""}">Résumé</button></div></div>`;
+
     function power() {
+      if (st.mode === "resume") return resumeTable();
       let rows = core.teams.filter((t) => (!st.conf || t.conf === st.conf) && (!st.tier || t.tier === st.tier));
       rows.sort((a, b) => {
         const x = val(a, st.sort), y = val(b, st.sort);
@@ -36,6 +53,7 @@ import { saveOverlay } from "../league/store.js";
       const mx = Math.max(...core.teams.map((t) => t.rating)), mn = Math.min(...core.teams.map((t) => t.rating));
       panel.innerHTML = `
         <div class="btn-row" style="margin-bottom:14px">
+          ${modeSeg()}
           <div class="field" style="min-width:200px"><label for="fc">Conference</label><div id="cbConf"></div></div>
           <div class="field" style="min-width:140px"><label for="ft">Tier</label><div id="cbTier"></div></div>
           <div class="field" style="align-self:end"><span class="muted">${rows.length} teams</span></div>
@@ -44,15 +62,50 @@ import { saveOverlay } from "../league/store.js";
           ${rows.map((t) => `<tr><td class="rank c">${t.rank}</td><td>${teamLink(t)}</td><td class="muted">${esc(t.conf)}</td><td><span class="pill">${esc(t.tier)}</span></td><td class="r num">${t.w}-${t.l}</td><td class="r num ${t.margin >= 0 ? "up" : "down"}">${signed(t.margin)}</td><td class="r num muted">${t.oppRating.toFixed(1)}</td><td class="r num ${t.rating - t.tierRating >= 0 ? "up" : "down"}">${signed(t.rating - t.tierRating)}</td>
             <td class="r"><div class="bar-cell" style="justify-content:flex-end"><i style="width:${Math.max(4, ((t.rating - mn) / (mx - mn)) * 70)}px"></i><span><b>${t.rating.toFixed(1)}</b></span></div></td></tr>`).join("")}
         </tbody></table></div>`;
+      wireFilters();
+    }
+    function wireFilters() {
       combobox(panel.querySelector("#cbConf"), { id: "fc", value: st.conf, placeholder: "Conference", onChange: (v) => { st.conf = v; power(); },
         options: [{ value: "", label: "All conferences" }, ...core.confs.map((c) => ({ value: c, label: c }))] });
       combobox(panel.querySelector("#cbTier"), { id: "ft", value: st.tier, searchable: false, onChange: (v) => { st.tier = v; power(); },
         options: [{ value: "", label: "All tiers" }, ...["S", "A", "B", "C", "D", "F"].map((c) => ({ value: c, label: "Tier " + c }))] });
       panel.querySelectorAll("th.sortable").forEach((th) => th.onclick = () => {
         const k = th.dataset.k;
-        if (st.sort === k) st.dir *= -1; else { st.sort = k; st.dir = ["rank", "name", "conf", "tier"].includes(k) ? 1 : -1; }
+        if (st.sort === k) st.dir *= -1; else { st.sort = k; st.dir = ["rank", "name", "conf", "tier", "prank"].includes(k) ? 1 : -1; }
         power();
       });
+      panel.querySelectorAll("#mode button").forEach((b) => b.onclick = () => {
+        if (st.mode === b.dataset.m) return;
+        st.mode = b.dataset.m; st.sort = "rank"; st.dir = 1;
+        history.replaceState(null, "", st.mode === "resume" ? "#resume" : "#"); power();
+      });
+    }
+    function resumeTable() {
+      const R = resumeOf(), played = core.teams.some((t) => t.gp);
+      let rows = core.teams.filter((t) => (!st.conf || t.conf === st.conf) && (!st.tier || t.tier === st.tier));
+      rows.sort((a, b) => {
+        const x = rval(a, st.sort), y = rval(b, st.sort);
+        return (typeof x === "string" ? x.localeCompare(y) : x - y) * st.dir || rval(a, "rank") - rval(b, "rank");
+      });
+      const ql = (q) => `${q[0]}-${q[1]}`;
+      const wabs = R.rows.filter((x) => x.gp).map((x) => x.wab), mx = Math.max(0.01, ...wabs.map(Math.abs));
+      panel.innerHTML = `
+        <div class="btn-row" style="margin-bottom:14px">
+          ${modeSeg()}
+          <div class="field" style="min-width:200px"><label for="fc">Conference</label><div id="cbConf"></div></div>
+          <div class="field" style="min-width:140px"><label for="ft">Tier</label><div id="cbTier"></div></div>
+          <div class="field" style="align-self:end"><span class="muted">${rows.length} teams</span></div>
+        </div>
+        ${played ? `<div class="table-wrap"><table><thead><tr>${RCOLS.map(([k, label, , al]) => `<th class="sortable ${al || ""} ${st.sort === k ? "sorted" : ""}" data-k="${k}" aria-sort="${st.sort === k ? (st.dir > 0 ? "ascending" : "descending") : "none"}">${label}${st.sort === k ? (st.dir > 0 ? " ▲" : " ▼") : ""}</th>`).join("")}</tr></thead><tbody>
+          ${rows.map((t) => { const x = R.rows[t.id], pr = R.powerRank.get(t.id);
+            return `<tr><td class="rank c">${x.rank ?? "–"}</td><td>${teamLink(t)}</td><td class="muted">${esc(t.conf)}</td><td><span class="pill">${esc(t.tier)}</span></td><td class="r num">${t.w}-${t.l}</td>
+            ${x.q.map((q, i) => `<td class="r num ${i === 0 && q[0] ? "up" : i >= 2 && q[1] ? "down" : "muted"}">${ql(q)}</td>`).join("")}
+            <td class="r num muted">${pr ?? "–"}${pr && x.rank ? ` <span class="${pr - x.rank > 0 ? "up" : pr - x.rank < 0 ? "down" : "faint"}" style="font-size:.78rem">${pr - x.rank > 0 ? "▲" + (pr - x.rank) : pr - x.rank < 0 ? "▼" + (x.rank - pr) : ""}</span>` : ""}</td>
+            <td class="r"><div class="bar-cell" style="justify-content:flex-end"><i style="width:${Math.max(4, ((x.wab + mx) / (2 * mx)) * 70)}px"></i><span><b>${x.gp ? signed(x.wab) : "–"}</b></span></div></td></tr>`; }).join("")}
+        </tbody></table></div>
+        <p class="faint" style="margin:12px 0 0;font-size:.82rem">WAB = wins above bubble: wins minus the wins a bubble team (the 45th-best power rating) would expect against the same schedule, at the same venues. Quadrants are by the opponent's power rank and venue: Q1 is home 1-30, neutral 1-50, away 1-75; Q2 home 31-75, neutral 51-100, away 76-135; Q3 home 76-160, neutral 101-200, away 136-240; Q4 the rest. The arrow by Power # shows how far the résumé moves a team versus its power rating. The Bracketology Board blends the two half and half.</p>`
+        : `<div class="empty"><h3>No résumés yet</h3><p class="muted">Résumé ratings start once games are played. Until then the power ratings run on tiers.</p></div>`}`;
+      wireFilters();
     }
 
     const { state, season } = core;

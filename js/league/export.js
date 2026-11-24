@@ -8,7 +8,7 @@ import { statsAsOf } from "./insights.js";
 export const EXPORT_FORMAT = "hardwood-bracketology-export";
 
 export function buildSeasonExport(state, { id, label, status } = {}) {
-  const c = calc(state), L = state.data.league, T = state.data.teams, S = state.data.bracketology?.settings || BOARD_DEFAULTS;
+  const c = calc(state), L = state.data.league, T = state.data.teams, S = { ...BOARD_DEFAULTS, ...state.data.bracketology?.settings };
   const played = state.games.filter((g) => g.ptsA != null);
   const throughDay = played.reduce((m, g) => Math.max(m, g.day), 0);
   const content = state.content;
@@ -23,7 +23,7 @@ export function buildSeasonExport(state, { id, label, status } = {}) {
     const s = c.teams[t.id].stats, b = board.find((r) => r.team === t.id), p = before[t.id];
     return { id: t.id, name: t.name, conf: T[t.id].conf, tier: T[t.id].tier, W: s.W, L: s.L, confW: s.confW, confL: s.confL, home: s.home, away: s.away, neutral: s.neutral,
       pfpg: +s.pfpg.toFixed(1), papg: +s.papg.toFixed(1), margin: +s.margin.toFixed(1), rating: +s.rating.toFixed(2), rank: s.rank, sos: +s.sos.toFixed(2), tierRating: +s.tierRating.toFixed(2),
-      last10: s.last10, streak: s.streak, q1w: b.q1w, q2w: b.q2w, badLosses: b.badL, boardScore: +b.score.toFixed(2),
+      last10: s.last10, streak: s.streak, q1w: b.q1w, q2w: b.q2w, badLosses: b.badL, quads: b.quads, wab: +b.wab.toFixed(2), resumeRank: b.resumeRank, boardScore: +b.score.toFixed(2),
       sinceLastEdition: { ratingThen: p.GP ? +p.rating.toFixed(2) : null, rankThen: p.rank, recordThen: `${p.W}-${p.L}` } };
   });
   const confs = [...new Set(L.map((t) => T[t.id].conf))].sort();

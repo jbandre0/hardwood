@@ -11,7 +11,7 @@ const FX = fixture("season2-workbook-expected").board, B = data.bracketology;
 
 test("Bracketology Board for week 4 matches the workbook for all 365 teams", () => {
   const wk = FX.settings.week;
-  const { rows, lines } = computeBoard({ teams, games: state.games, throughDay: FX.settings.throughDay, picks: B.picks.filter((p) => p.week === wk), commAdj: B.commAdj.filter((a) => a.week === wk), settings: B.settings });
+  const { rows, lines } = computeBoard({ teams, games: state.games, throughDay: FX.settings.throughDay, picks: B.picks.filter((p) => p.week === wk), commAdj: B.commAdj.filter((a) => a.week === wk), settings: { ...B.settings, formula: "workbook" } });
   assert.ok(near(lines.q1, FX.lines.q1, 1e-9) && near(lines.q2, FX.lines.q2, 1e-9) && near(lines.bad, FX.lines.bad, 1e-9), "quality-win lines");
   let worst = 0;
   for (const r of rows) {

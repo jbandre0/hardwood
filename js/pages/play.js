@@ -2,7 +2,7 @@ import { shell, fail } from "../ui.js";
 import { combobox } from "../combobox.js";
 import { loadCore, resetCores, esc, badge, teamLink, signed, apTag, apName } from "../data.js";
 import { engineVersion, rollAndRecord, rollGame, recordRolled, playDay, undoLast, toOverlay, nextUnplayed, calc, setContent, syncTournament } from "../league/league.js";
-import { computeBoard } from "../league/bracketology.js";
+import { computeBoard, BOARD_DEFAULTS } from "../league/bracketology.js";
 import { suggestField, validateField } from "../league/field.js";
 import { lockDay, lockPrediction, DEFAULT_SIMS } from "../league/predictions.js";
 import { dayDone } from "../league/recap.js";
@@ -180,7 +180,7 @@ const clearPending = (sid) => { try { localStorage.removeItem(pendKey(sid)); } c
     const simsBox = document.getElementById("cbSims");
     if (simsBox) combobox(simsBox, { id: "predSims", value: String(predSims()), searchable: false, options: [1000, 2000, 3000, 5000, 10000, 40000].map((n) => ({ value: String(n), label: n.toLocaleString() + (n === 40000 ? " (backtest standard, slow)" : "") })), onChange: (v) => { try { localStorage.setItem("hw-pred-sims", v); } catch { /* ignore */ } } });
     document.getElementById("lockField")?.addEventListener("click", async () => {
-      const c = calc(state), B = core.data.bracketology || { settings: {} }, S = { q1Rank: 25, q2Rank: 50, badLossRank: 100, winWeight: 8, q1Pts: 1.5, q2Pts: 0.75, badLossPts: 1.5, atLarge: 37, seedBump: 2, ...B.settings };
+      const c = calc(state), B = core.data.bracketology || { settings: {} }, S = { ...BOARD_DEFAULTS, ...B.settings };
       const tm = teams.map((t) => ({ id: t.id, conf: t.conf, rating: t.rating, eff: t.eff }));
       const rows = computeBoard({ teams: tm, games: state.games, throughDay: 47, picks: [], commAdj: [], settings: S }).rows;
       const champs = new Map(state.games.filter((g) => g.type === "CT" && g.day === 47).map((g) => [g.ctx, g.ptsA > g.ptsB ? g.a : g.b]));

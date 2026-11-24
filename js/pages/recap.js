@@ -15,7 +15,7 @@ import { dayRecap, dayDone } from "../league/recap.js";
     const R = dayRecap(state, day);
     const pct = (p) => `${Math.round(p * 100)}%`;
     // each team's record after this day's games, next to its name
-    const tm = (id) => `<span style="display:inline-flex;align-items:center;gap:6px">${teamLink(teams[id])}<span class="faint num" style="font-size:.82rem;font-weight:500">(${recordAsOf(core, id, day)})</span></span>`;
+    const tm = (id) => `<span style="display:inline-flex;align-items:center;gap:6px">${teamLink(teams[id])}<span class="faint num" style="font-size:.82rem;font-weight:500">(${recordAsOf(core, id, day)}${R.ratingAfter[id] != null ? ` &middot; ${signed(R.ratingAfter[id])}` : ""})</span></span>`;
     const score = (g) => { const aw = g.ptsA > g.ptsB; return `<tr><td class="${aw ? "wcell" : ""}">${tm(g.a)}</td><td class="r num ${aw ? "w wcell" : "muted"}">${g.ptsA}</td><td class="faint c">${g.home ? "at" : "vs"}</td><td class="${aw ? "" : "wcell"}">${tm(g.b)}</td><td class="r num ${aw ? "muted" : "w wcell"}">${g.ptsB}</td><td>${g.ot ? `<span class="pill">${g.ot > 1 ? g.ot : ""}OT</span>` : ""}${g.pWin < 0.3 ? ' <span class="pill warm">upset</span>' : ""}</td><td class="muted">${esc(roundOf(g))}</td></tr>`; };
     const mv = (x) => x.prev == null ? '<span class="pill warm">NEW</span>' : x.prev === x.rank ? '<span class="faint">—</span>' : x.prev > x.rank ? `<span class="up">▲ ${x.prev - x.rank}</span>` : `<span class="down">▼ ${x.rank - x.prev}</span>`;
     const top = R.upsets[0];
@@ -50,7 +50,7 @@ import { dayRecap, dayDone } from "../league/recap.js";
         </div>
       </div>
       <div id="records"></div>
-      <div class="card plain"><div class="card-head"><h2>Every result</h2><span class="muted">${R.games.length} games</span></div>
+      <div class="card plain"><div class="card-head"><h2>Every result</h2><span class="muted">${R.games.length} games &middot; (record &middot; power rating) after the day</span></div>
         <div class="table-wrap"><table><tbody>${R.games.map(score).join("")}</tbody></table></div></div>`;
     // a finished day: save a backup to the chosen folder (silently skipped if none is connected or Chrome wants a click)
     autoBackup({ season: season.id, day }).then((i) => { if (i) { const n = document.createElement("p"); n.className = "faint"; n.style.cssText = "margin:-8px 0 14px;font-size:.82rem"; n.textContent = `Backup saved to ${i.folder} (${i.name}).`; const t = document.querySelector(".page-title"); if (t) t.after(n); } });

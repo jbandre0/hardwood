@@ -22,6 +22,7 @@ export function dayRecap(state, day) {
   const fellUnbeaten = games.filter((g) => before[g.l].GP && before[g.l].L === 0).map((g) => ({ id: g.l, name: L[g.l].name, by: L[g.w].name, rec: `${now[g.l].W}-${now[g.l].L}` }));
   const nextDay = state.games.filter((g) => g.ptsA == null && g.a != null).reduce((m, g) => Math.min(m, g.day), Infinity);
   return {
+    ratingAfter: now.map((x) => (x.GP ? x.rating : null)),   // each team's power rating after this day (null before its first game)
     day, games, upsets: games.filter((g) => g.pWin < 0.5).sort((x, y) => x.pWin - y.pWin),
     overtime: games.filter((g) => g.ot), blowout: games.reduce((m, g) => (!m || g.margin > m.margin ? g : m), null),
     closest: games.reduce((m, g) => (!m || g.margin < m.margin ? g : m), null), highest: games.reduce((m, g) => (!m || g.ptsA + g.ptsB > m.ptsA + m.ptsB ? g : m), null),
